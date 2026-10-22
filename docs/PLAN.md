@@ -65,3 +65,35 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
 2. Fig. 2 — RMSE vs drift intensity per regime, all methods
 3. Fig. 3 — coverage vs abstention / anchor size
 4. Table 1 — related-work matrix; Table 2 — main results (test regimes); Table 3 — ablations
+
+## Method decision log (dev split only; test untouched)
+
+1. **Worst-case bounds in the selector** (proposal §4.5, `selection="bound"`): every
+   B̄_k contains the anchor's own noise, so the objective collapses onto the anchor
+   (S3a dev smoke: RMSE 0.033 vs pooled 0.009, oracle 0.006). Kept as ablation.
+2. **Debiased mixture-MSE selector** (`selection="mse"`): E[(β·d)²] − Var(β·d) is
+   unbiased for the squared mixture bias, but its noise is anchor-scale, so in S0 it
+   still pays heavily (0.015 vs pooled 0.0046). Kept as ablation.
+3. **Reward-homogeneity grouping + anchor veto** (`selection="segment"`, default):
+   after context transport and propensity correction, transported window values can
+   only disagree through reward drift, and window-vs-window comparisons have
+   history-scale precision (sd ≈ 0.005) instead of anchor-scale (≈ 0.035). Take the
+   most recent homogeneous group the anchor does not contradict. Dev smoke: S0 0.0042
+   (pooled 0.0046), S3a 0.0058 (oracle 0.0053).
+   → This is the paper's core mechanism claim: *context and policy drift are removed by
+   transport/propensities; what remains between windows is reward drift, which is
+   detectable without the anchor; the anchor only has to arbitrate between groups.*
+4. Interval: mixture-level allowance |β·d| + z·sd(β·d) on the held-out half (split
+   variant) — valid by Prop. 2 but never narrower than anchor-only (as predicted).
+
+## Related-work items to add (novelty risk)
+
+- **MAGIC** (Thomas & Brunskill, ICML 2016): blends estimators by minimizing
+  variance + bias², bias estimated as distance to a reference estimator's CI —
+  close to our "bound" ablation. Must cite and contrast.
+- Liu et al. 2023 Reg-DR: old data only through r_hat; correction on current data.
+- Zhan et al. 2021: variance-stabilizing weights, stationary reward.
+- Heterogeneity testing (Cochran's Q / meta-analysis) and change-point detection —
+  our grouping step is an instance; cite as such rather than claim novelty for it.
+- Pre-test estimators (Bancroft 1944; Judge & Bock): the anchor veto is a pre-test;
+  expect the known mid-intensity risk bump — report it.

@@ -1,0 +1,160 @@
+"""Analyze 03_evaluate outputs.
+
+    dev : apply the protocol's family-wise tuning rule -> results/tuned.json
+    test: main table, paired bootstrap vs best tuned baseline, go/no-go check
+
+    .venv/bin/python scripts/04_analyze.py --split dev
+    .venv/bin/python scripts/04_analyze.py --split test
+"""
+
+import argparse
+import json
+import re
+from collections import defaultdict
+from pathlib import Path
+
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[1]
+FAMILY = re.compile(r"^(recent_dr|decay_dr|liu_reg|odrift_split|odrift)\[(.+)\]$")
+FAMILY_KEY = {"recent_dr": "recent", "decay_dr": "decay", "liu_reg": "liu", "odrift": "odrift"}
+BASELINES = ["pooled_dr", "anchor_dr", "recent_dr", "decay_dr", "minvar_dr", "liu_reg", "transport_dr"]
+
+
+def per_rep(cell, method, field="err"):
+    """(reps, policies) array of a field."""
+    return np.array([[p[field] for p in r[method]] for r in cell["reps"]], dtype=float)
+
+
+def rmse(cell, method):
+    return float(np.sqrt(np.mean(per_rep(cell, method) ** 2)))
+
+
+def coverage(cell, method, field="hw"):
+    err, hw = per_rep(cell, method), per_rep(cell, method, field)
+    return float(np.mean(np.abs(err) <= hw)) if np.isfinite(hw).all() else float("nan")
+
+
+def regret(cell, method):
+    """Mean policy-selection regret: V(best) - V(argmax of estimates)."""
+    est = per_rep(cell, method, "est")
+    out = []
+    for r, env in enumerate(cell["env_of_rep"]):
+        truths = np.array(cell["truths"][str(env)])
+        out.append(truths.max() - truths[np.argmax(est[r])])
+    return float(np.mean(out))
+
+
+def paired_bootstrap(cell, a, b, n_boot=10_000, seed=0):
+    """95% CI of RMSE(a) - RMSE(b), resampling replications (policies kept together)."""
+    sa = (per_rep(cell, a) ** 2).mean(axis=1)
+    sb = (per_rep(cell, b) ** 2).mean(axis=1)
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, len(sa), size=(n_boot, len(sa)))
+    d = np.sqrt(sa[idx].mean(axis=1)) - np.sqrt(sb[idx].mean(axis=1))
+    return float(np.sqrt(sa.mean()) - np.sqrt(sb.mean())), float(np.percentile(d, 2.5)), float(np.percentile(d, 97.5))
+
+
+def tune(data):
+    """Family-wise: minimize mean over dev cells of log RMSE."""
+    scores = defaultdict(lambda: defaultdict(list))
+    for cell in data["cells"].values():
+        for method in cell["reps"][0]:
+            m = FAMILY.match(method)
+            if m and m.group(1) in FAMILY_KEY:
+                scores[FAMILY_KEY[m.group(1)]][m.group(2)].append(np.log(rmse(cell, method)))
+    tuned, report = {}, {}
+    for fam, settings in scores.items():
+        means = {s: float(np.mean(v)) for s, v in settings.items()}
+        best = min(means, key=means.get)
+        report[fam] = dict(sorted(means.items(), key=lambda kv: kv[1]))
+        parsed = [float(x) for x in best.split(",")]
+        tuned[fam] = parsed if len(parsed) > 1 else (int(parsed[0]) if parsed[0].is_integer() and fam != "decay" else parsed[0])
+    return tuned, report
+
+
+def table(data, methods):
+    rows = []
+    for key, cell in data["cells"].items():
+        for m in methods:
+            if m not in cell["reps"][0]:
+                continue
+            rows.append(dict(cell=key, method=m, rmse=rmse(cell, m), cov=coverage(cell, m), regret=regret(cell, m),
+                             cov_narrow=coverage(cell, m, "hw_narrow") if "hw_narrow" in cell["reps"][0][m][0] else None))
+    return rows
+
+
+def print_table(rows):
+    cells = list(dict.fromkeys(r["cell"] for r in rows))
+    methods = list(dict.fromkeys(r["method"] for r in rows))
+    by = {(r["cell"], r["method"]): r for r in rows}
+    print("\nRMSE (x1e3)  [coverage@95]  {regret x1e3}")
+    print(f"{'method':24s}" + "".join(f"{c:>20s}" for c in cells))
+    for m in methods:
+        line = f"{m:24s}"
+        for c in cells:
+            r = by.get((c, m))
+            if r is None:
+                line += f"{'':>20s}"
+                continue
+            cov = "" if np.isnan(r["cov"]) else f"[{r['cov']:.2f}]"
+            line += f"{r['rmse'] * 1e3:7.2f}{cov:>7s}{{{r['regret'] * 1e3:4.1f}}}"
+        print(line)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--split", choices=["dev", "test"], required=True)
+    ap.add_argument("--file", default=None)
+    args = ap.parse_args()
+    data = json.loads((ROOT / (args.file or f"results/03_{args.split}.json")).read_text())
+
+    if args.split == "dev":
+        tuned, report = tune(data)
+        for fam, means in report.items():
+            print(f"{fam:8s} " + "  ".join(f"{s}:{v:.3f}" for s, v in list(means.items())[:5]))
+        (ROOT / "results/tuned.json").write_text(json.dumps(tuned, indent=2))
+        print(f"\ntuned: {tuned}  -> results/tuned.json")
+    else:
+        tuned = json.loads((ROOT / "results/tuned.json").read_text())
+
+    def name(fam, prefix):
+        v = tuned[fam]
+        return f"{prefix}[{','.join(str(x) for x in v)}]" if isinstance(v, list) else f"{prefix}[{v}]"
+
+    od, ods = name("odrift", "odrift"), name("odrift", "odrift_split")
+    tuned_baselines = ["pooled_dr", "anchor_dr", name("recent", "recent_dr"), name("decay", "decay_dr"),
+                       "minvar_dr", name("liu", "liu_reg"), "transport_dr"]
+    methods = tuned_baselines + [od, ods, "ablate_mse", "ablate_bound", "oracle"]
+    rows = table(data, methods)
+    print_table(rows)
+
+    print(f"\nO-DRIFT ({od}) vs best tuned baseline per cell: RMSE diff, paired 95% CI, ratio")
+    summary = {}
+    for key, cell in data["cells"].items():
+        if od not in cell["reps"][0]:
+            continue
+        base = min((m for m in tuned_baselines if m in cell["reps"][0]), key=lambda m: rmse(cell, m))
+        d, lo, hi = paired_bootstrap(cell, od, base)
+        ratio = rmse(cell, od) / rmse(cell, base)
+        cov = coverage(cell, ods)
+        summary[key] = dict(best_baseline=base, diff=d, ci=[lo, hi], ratio=ratio, coverage_split=cov,
+                            coverage_plugin_narrow=coverage(cell, od, "hw_narrow"))
+        print(f"  {key:10s} vs {base:18s} diff={d * 1e3:+6.2f}e-3 CI=[{lo * 1e3:+6.2f},{hi * 1e3:+6.2f}] "
+              f"ratio={ratio:.2f}  cov(split)={cov:.3f}  cov(narrow)={summary[key]['coverage_plugin_narrow']:.3f}")
+
+    if args.split == "test":
+        go = []
+        drift = [k for k in summary if k.split("@")[0] in ("S3a", "S3b", "S4", "S5")]
+        wins = [k for k in drift if summary[k]["ratio"] <= 0.90 and summary[k]["ci"][1] < 0]
+        go.append((f"RMSE <= 0.9x best in >= 2 reward-drift cells (won {len(wins)}: {wins})", len(wins) >= 2))
+        stat = [k for k in summary if k.split("@")[0] in ("S0", "S1", "S2")]
+        go.append(("RMSE <= 1.1x best in S0/S1/S2", all(summary[k]["ratio"] <= 1.10 for k in stat)))
+        go.append(("coverage(split) >= 0.93 everywhere", all(summary[k]["coverage_split"] >= 0.93 for k in summary)))
+        for crit, ok in go:
+            print(f"  [{'PASS' if ok else 'FAIL'}] {crit}")
+        (ROOT / "results/04_test_summary.json").write_text(json.dumps(dict(summary=summary, go=go), indent=2))
+
+
+if __name__ == "__main__":
+    main()
