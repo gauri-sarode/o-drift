@@ -104,3 +104,15 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    (e.g. anchor 0.600 vs group 0.465, z≈2.7) and the fallback is anchor-alone → large
    error. Candidate fixes to compare on dev: higher z_anchor (already in grid), fallback
    to least-contradicted group instead of anchor-only, robust (self-normalized) anchor.
+6. **Dev results with all baselines (n=200/cell, 4 candidate policies)**: tuned O-DRIFT
+   (old anchor-only fallback) was 2–3.4x worse than the best tuned baseline in every cell.
+   Least-contradicted fallback cuts that 2–3x (anchor-only outputs were only ~2% of runs
+   but carried huge heavy-tailed errors). z_group sweep shows a hard trade-off, no
+   setting dominates: z_g=3 matches transport DR in S0/S1/S2 but loses to recent-6 under
+   reward drift (S3a 12.3 vs 7.8); z_g=2 helps S3 but false-splits in S1 (9.2 vs 6.6).
+   Root cause: at intensity 0.5, per-window transfer bias (~0.005–0.024) is below
+   per-window noise (~0.02), so reward drift is not reliably detectable.
+   Oracle headroom over tuned recency is only ~10% (S3a/S3b), ~0% (S4).
+   Worst-case ratio to per-cell best (dev, optimistic): O-DRIFT z_g=2/z_a=3 1.54,
+   transport DR 1.71, recent-6 2.01, decay-0.8 2.16, pooled 3.25.
+   Self-normalized anchor: no effect.

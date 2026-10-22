@@ -36,7 +36,7 @@ def name(zg, za, fb, sn):
 
 
 def run_one(args):
-    regime_name, intensity, env_seed, data_seed, truths, z_groups = args
+    regime_name, intensity, env_seed, data_seed, truths, z_groups, z_anchors, fallbacks, sns = args
     env = EnvParams.sample(env_seed, d=SIM["d"], n_actions=SIM["n_actions"], misspec=SIM["misspec"])
     regime = REGIMES[regime_name](intensity, K=SIM["n_windows"])
     pis = [Policy.near_optimal(env, noise=s, seed=env_seed) for s in TUNE["candidate_policies"]]
@@ -45,11 +45,11 @@ def run_one(args):
     nuis = fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, env.n_actions, CFG, data_seed)
     out = {}
     for p_idx, pi in enumerate(pis):
-        for sn in SN:
+        for sn in sns:
             cfg = replace(CFG, anchor_sn=sn)
             comps, anc = build_components(ep.history, ep.anchor, ep.target_contexts, pi, env.n_actions, cfg,
                                           nuisances=nuis)
-            for zg, za, fb in itertools.product(z_groups, Z_ANCHOR, FALLBACKS):
+            for zg, za, fb in itertools.product(z_groups, z_anchors, fallbacks):
                 r = combine(comps, anc, replace(cfg, z_group=zg, z_anchor=za, fallback=fb))
                 out.setdefault(name(zg, za, fb, sn), []).append(dict(err=r.value - truths[p_idx], hw=r.half_width,
                                                                   anchor_only=r.weights.get(len(comps), 0) > 0.999))
@@ -77,7 +77,7 @@ def main():
     with ProcessPoolExecutor() as pool:
         for key, cell in dev["cells"].items():
             regime_name, intensity = key.split("@")[0], float(key.split("@")[1])
-            jobs = [(regime_name, intensity, e, start + s, cell["truths"][str(e)], z_groups)
+            jobs = [(regime_name, intensity, e, start + s, cell["truths"][str(e)], z_groups, Z_ANCHOR, FALLBACKS, SN)
                     for e in DEV["env_seeds"] for s in range(args.reps)]
             res = list(pool.map(run_one, jobs))
             summary[key] = {}
@@ -86,6 +86,7 @@ def main():
                 summary[key][v] = dict(rmse=float(np.sqrt((err ** 2).mean())),
                                        anchor_only=float(np.mean([[p["anchor_only"] for p in r[v]] for r in res])))
             print(key, flush=True)
+    # (grids are passed in the job tuple: worker processes are spawned and would not see globals)
     # mean log RMSE across dev cells -- the protocol's selection criterion
     score = {v: float(np.mean([np.log(summary[k][v]["rmse"]) for k in summary])) for v in summary[next(iter(summary))]}
     print(f"\n{'variant':28s}" + "".join(f"{k:>11s}" for k in summary) + "   meanlog")
