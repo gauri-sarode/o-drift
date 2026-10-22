@@ -1,0 +1,58 @@
+# Experimental protocol. Frozen BEFORE any O-DRIFT tuning (see docs/PLAN.md).
+# Any change after the freeze date must be committed with a reason in the message.
+# Rule: no method/hyperparameter/threshold decision may use test-split outcomes.
+# Test splits are run once per frozen configuration and reported as-is.
+
+status: DRAFT  # -> FROZEN once the user confirms the go/no-go thresholds below
+freeze_date: null
+
+simulator:
+  d: 5
+  n_actions: 10
+  n_windows: 12
+  misspec: 0.5
+  n_per_window: 5000
+  n_anchor_default: 1000
+  anchor_sweep: [0, 100, 1000, 10000]
+  n_target_contexts: 10000
+  n_mc_truth: 1000000
+
+splits:
+  dev:
+    env_seeds: [0, 1, 2, 3]
+    data_seeds: {start: 0, count: 50}        # per env seed
+    regimes:                                  # intensities used for all tuning
+      S0: [0.0]
+      S1: [1.0]
+      S2: [0.0]
+      S3a: [0.5]
+      S3b: [0.5]
+      S4: [0.5]
+  test:
+    env_seeds: [100, 101, 102, 103]           # unseen environments
+    data_seeds: {start: 10000, count: 75}     # per env seed -> 300 reps
+    regimes:                                  # held-out intensities + held-out drift types
+      S0: [0.0]
+      S1: [0.5, 2.0]
+      S2: [0.0]
+      S3a: [0.25, 1.0]
+      S3b: [0.25, 1.0]
+      S4: [0.25, 1.0]
+      S5: [0.5, 1.0]                          # drift type never seen in dev
+      S6: [0.0]
+      S7: [0.0]
+  real:
+    dataset: open_bandit  # semi-synthetic temporal interventions only; never claimed as natural drift
+
+endpoints:
+  primary: [rmse, policy_selection_regret]
+  secondary: [coverage_95, coverage_90, mean_interval_width, abstention_rate, selective_coverage]
+  stats: paired bootstrap over replications (10k resamples), 95% CI on RMSE differences
+
+go_no_go:  # PROPOSED defaults -- confirm before freezing
+  go_if_all:
+    - O-DRIFT RMSE <= 0.90 x best tuned baseline in >= 2 of {S3a, S3b, S4, S5} test cells, paired 95% CI excluding 0
+    - O-DRIFT RMSE <= 1.10 x best baseline in S0, S1, S2 (bounded regret when no reward drift)
+    - coverage among non-abstained estimates >= 0.93 at nominal 0.95 in every test regime with an anchor
+    - abstains in >= 90% of S7 replications where target actions lack support in every eligible source
+  if_no_go: pivot to benchmark/failure-mode paper (proposal §16)
