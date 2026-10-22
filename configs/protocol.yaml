@@ -45,7 +45,9 @@ splits:
     dataset: open_bandit  # semi-synthetic temporal interventions only; never claimed as natural drift
 
 tuning:  # dev split only
-  lambda_grid: [0.25, 0.5, 1.0, 2.0, 4.0]   # bias-penalty weight in the selection objective
+  lambda_grid: [0.25, 0.5, 1.0, 2.0, 4.0]   # bias-penalty weight ("mse" selector ablation)
+  z_group_grid: [2.0, 3.0, 4.0]             # window-homogeneity threshold ("segment" selector)
+  z_anchor_grid: [1.5, 2.0, 2.5]            # anchor-veto threshold ("segment" selector)
   delta_split: {variance: 0.025, bias: 0.025}  # union-bound allocation for 95% intervals
 
 endpoints:
