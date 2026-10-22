@@ -24,7 +24,7 @@ computed on data independent of beta in the sample-split variant:
     V_alpha +/- (z_v SE_alpha + |beta . d| + z_b sd(beta . d)).
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 from scipy.optimize import minimize
@@ -119,17 +119,32 @@ class Component:
                      + self.corr_scores.var(ddof=1) / len(self.corr_scores))
 
 
-def transported_dr(data: LoggedData, X_target: np.ndarray, pi, n_actions: int, index: int,
-                   z_crit: float, min_ess: float, same_distribution: bool = False,
-                   seed: int = 0) -> Component:
-    """V_{T<-k} = mean_j m_k(X*_j) + mean_i w(X_i) rho_i (R_i - q_k(X_i, A_i))."""
-    pi_src = pi.probs(data.X)
+@dataclass
+class Nuisances:
+    """Policy-independent fits for one window, reusable across candidate policies."""
+    q_src: np.ndarray   # out-of-fold q_hat on the window's own contexts, (n, A)
+    q_tgt: np.ndarray   # fold-averaged q_hat on target contexts, (M, A)
+    w: np.ndarray       # context ratio p_T/p_k on the window's contexts, (n,)
+
+
+def fit_nuisances(data: LoggedData, X_target: np.ndarray, n_actions: int,
+                  same_distribution: bool = False, seed: int = 0) -> Nuisances:
     q_src, q_tgt = crossfit_rewards(data, n_actions, seed=seed, extra_X=X_target)
     w = np.ones(len(data)) if same_distribution else context_ratio(data.X, X_target, seed=seed)
+    return Nuisances(q_src, q_tgt, w)
+
+
+def transported_dr(data: LoggedData, X_target: np.ndarray, pi, n_actions: int, index: int,
+                   z_crit: float, min_ess: float, same_distribution: bool = False,
+                   seed: int = 0, nuis: Nuisances | None = None) -> Component:
+    """V_{T<-k} = mean_j m_k(X*_j) + mean_i w(X_i) rho_i (R_i - q_k(X_i, A_i))."""
+    if nuis is None:
+        nuis = fit_nuisances(data, X_target, n_actions, same_distribution, seed)
+    pi_src = pi.probs(data.X)
     rho = importance_weights(data, pi_src)
-    corr = w * rho * (data.R - q_src[np.arange(len(data)), data.A])
-    dm_scores = (pi.probs(X_target) * q_tgt).sum(axis=1)
-    diag = diagnose(data, pi_src, n_actions, w, z_crit, min_ess)
+    corr = nuis.w * rho * (data.R - nuis.q_src[np.arange(len(data)), data.A])
+    dm_scores = (pi.probs(X_target) * nuis.q_tgt).sum(axis=1)
+    diag = diagnose(data, pi_src, n_actions, nuis.w, z_crit, min_ess)
     return Component(index, float(dm_scores.mean() + corr.mean()), dm_scores, corr, diag)
 
 
@@ -289,16 +304,28 @@ class ODriftResult:
         return lo <= truth <= hi
 
 
+def fit_all_nuisances(history: list, anchor: LoggedData, X_target: np.ndarray, n_actions: int,
+                      cfg: ODriftConfig, seed: int = 0) -> tuple:
+    """Policy-independent nuisances for every window and the anchor (or None)."""
+    hist = [fit_nuisances(d, X_target, n_actions, seed=seed + k) for k, d in enumerate(history)]
+    anc = (fit_nuisances(anchor, X_target, n_actions, same_distribution=True, seed=seed + 999)
+           if len(anchor) >= cfg.min_anchor else None)
+    return hist, anc
+
+
 def build_components(history: list, anchor: LoggedData, X_target: np.ndarray, pi, n_actions: int,
-                     cfg: ODriftConfig, seed: int = 0) -> tuple:
+                     cfg: ODriftConfig, seed: int = 0, nuisances: tuple | None = None) -> tuple:
     """Transported DR components for every window plus the anchor (or None)."""
+    if nuisances is None:
+        nuisances = fit_all_nuisances(history, anchor, X_target, n_actions, cfg, seed)
+    hist_nuis, anc_nuis = nuisances
     z_diag = norm.ppf(1 - cfg.delta_diagnostics / (2 * (len(history) + 1)))
-    comps = [transported_dr(d, X_target, pi, n_actions, k, z_diag, cfg.min_ess, seed=seed + k)
-             for k, d in enumerate(history)]
+    comps = [transported_dr(d, X_target, pi, n_actions, k, z_diag, cfg.min_ess, nuis=nu)
+             for k, (d, nu) in enumerate(zip(history, hist_nuis))]
     anchor_comp = None
-    if len(anchor) >= cfg.min_anchor:
+    if anc_nuis is not None:
         anchor_comp = transported_dr(anchor, X_target, pi, n_actions, len(history), z_diag,
-                                     cfg.min_ess, same_distribution=True, seed=seed + 999)
+                                     cfg.min_ess, same_distribution=True, nuis=anc_nuis)
     return comps, anchor_comp
 
 
@@ -353,6 +380,38 @@ def split_half(data: LoggedData, rng: np.random.Generator) -> tuple:
     return data.subset(m), data.subset(~m)
 
 
+@dataclass
+class SplitEpisode:
+    """Halves of every window, the anchor and the target contexts, with fitted nuisances."""
+    sel: tuple   # (history halves, anchor half, X_target half, nuisances)
+    est: tuple
+
+
+def make_split(history: list, anchor: LoggedData, X_target: np.ndarray, n_actions: int,
+               cfg: ODriftConfig, seed: int = 0) -> SplitEpisode:
+    rng = np.random.default_rng(seed + 7)
+    halves = [split_half(d, rng) for d in history]
+    a_sel, a_est = split_half(anchor, rng)
+    xt = rng.permutation(len(X_target))
+    parts = []
+    for i, (a, x) in enumerate(((a_sel, X_target[xt[::2]]), (a_est, X_target[xt[1::2]]))):
+        h = [hv[i] for hv in halves]
+        parts.append((h, a, x, fit_all_nuisances(h, a, x, n_actions, cfg, seed + 50 * i)))
+    return SplitEpisode(*parts)
+
+
+def odrift_split(split: SplitEpisode, pi, n_actions: int, cfg: ODriftConfig) -> ODriftResult:
+    """Bounds, eligibility and weights from the selection half; estimate,
+    SE and bias allowance from the estimation half (Proposition 2 conditions)."""
+    sel = build_components(*split.sel[:3], pi, n_actions, cfg, nuisances=split.sel[3])
+    est = build_components(*split.est[:3], pi, n_actions, cfg, nuisances=split.est[3])
+    if sel[1] is None or est[1] is None:
+        return combine(est[0], None, cfg)
+    for c_sel, c_est in zip(sel[0], est[0]):
+        c_est.diagnostics.reasons = c_sel.diagnostics.reasons
+    return combine(est[0], est[1], cfg, bound_comps=sel)
+
+
 def odrift(history: list, anchor: LoggedData, X_target: np.ndarray, pi, n_actions: int,
            cfg: ODriftConfig = ODriftConfig(), split: bool = False, seed: int = 0,
            lams: list | None = None) -> dict:
@@ -367,20 +426,5 @@ def odrift(history: list, anchor: LoggedData, X_target: np.ndarray, pi, n_action
     if not split:
         comps, anc = build_components(history, anchor, X_target, pi, n_actions, cfg, seed)
         return {lam: combine(comps, anc, cfg, lam) for lam in lams}
-    rng = np.random.default_rng(seed + 7)
-    halves = [split_half(d, rng) for d in history]
-    a_sel, a_est = split_half(anchor, rng)
-    xt = rng.permutation(len(X_target))
-    xt_sel, xt_est = X_target[xt[::2]], X_target[xt[1::2]]
-    sel = build_components([h[0] for h in halves], a_sel, xt_sel, pi, n_actions, cfg, seed)
-    est = build_components([h[1] for h in halves], a_est, xt_est, pi, n_actions, cfg, seed + 50)
-    out = {}
-    for lam in lams:
-        if sel[1] is None or est[1] is None:
-            out[lam] = combine(est[0], None, cfg, lam)
-            continue
-        # eligibility is decided on the selection half only
-        for c_sel, c_est in zip(sel[0], est[0]):
-            c_est.diagnostics.reasons = c_sel.diagnostics.reasons
-        out[lam] = combine(est[0], est[1], cfg, lam, bound_comps=sel)
-    return out
+    sp = make_split(history, anchor, X_target, n_actions, cfg, seed)
+    return {lam: odrift_split(sp, pi, n_actions, replace(cfg, lam=lam)) for lam in lams}
