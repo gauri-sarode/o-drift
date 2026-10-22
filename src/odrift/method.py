@@ -136,13 +136,20 @@ def fit_nuisances(data: LoggedData, X_target: np.ndarray, n_actions: int,
 
 def transported_dr(data: LoggedData, X_target: np.ndarray, pi, n_actions: int, index: int,
                    z_crit: float, min_ess: float, same_distribution: bool = False,
-                   seed: int = 0, nuis: Nuisances | None = None) -> Component:
-    """V_{T<-k} = mean_j m_k(X*_j) + mean_i w(X_i) rho_i (R_i - q_k(X_i, A_i))."""
+                   seed: int = 0, nuis: Nuisances | None = None,
+                   self_normalize: bool = False) -> Component:
+    """V_{T<-k} = mean_j m_k(X*_j) + mean_i w(X_i) rho_i (R_i - q_k(X_i, A_i)).
+
+    self_normalize divides the correction by mean(w rho) (self-normalized DR),
+    trading a small O(1/n) bias for lighter tails when rho is heavy-tailed.
+    """
     if nuis is None:
         nuis = fit_nuisances(data, X_target, n_actions, same_distribution, seed)
     pi_src = pi.probs(data.X)
     rho = importance_weights(data, pi_src)
     corr = nuis.w * rho * (data.R - nuis.q_src[np.arange(len(data)), data.A])
+    if self_normalize:
+        corr = corr / (nuis.w * rho).mean()
     dm_scores = (pi.probs(X_target) * nuis.q_tgt).sum(axis=1)
     diag = diagnose(data, pi_src, n_actions, nuis.w, z_crit, min_ess)
     return Component(index, float(dm_scores.mean() + corr.mean()), dm_scores, corr, diag)
@@ -247,25 +254,35 @@ def homogeneous_groups(values: np.ndarray, S: np.ndarray, z_crit: float) -> list
     return groups
 
 
-def segment_select(comps: list, S: np.ndarray, z_group: float, z_anchor: float) -> np.ndarray:
+def segment_select(comps: list, S: np.ndarray, z_group: float, z_anchor: float,
+                   fallback: str = "anchor") -> np.ndarray:
     """Weights over `comps` (anchor last): the most recent homogeneous group
     that the anchor does not contradict, pooled with the anchor at minimum
-    variance. Falls back to the anchor alone if every group is contradicted."""
+    variance. If every group is contradicted, fall back to the anchor alone
+    ("anchor") or to the least-contradicted group pooled with it ("least")."""
     h = len(comps) - 1
     alpha = np.zeros(h + 1)
     if h == 0:
         alpha[-1] = 1.0
         return alpha
     values = np.array([c.value for c in comps])
+    best_z, best_group = np.inf, None
     for group in homogeneous_groups(values[:h], S[:h, :h], z_group):
         w = select_weights(S[np.ix_(group, group)], np.zeros(len(group)), 0.0)
         diff = w @ values[group] - values[h]
         var = w @ S[np.ix_(group, group)] @ w + S[h, h] - 2 * w @ S[group, h]
-        if abs(diff) <= z_anchor * np.sqrt(max(var, 1e-18)):
-            idx = group + [h]
-            alpha[idx] = select_weights(S[np.ix_(idx, idx)], np.zeros(len(idx)), 0.0)
+        z = abs(diff) / np.sqrt(max(var, 1e-18))
+        if z <= z_anchor:
+            best_group = group
+            break
+        if z < best_z:
+            best_z, best_group = z, group
+    else:
+        if fallback == "anchor":
+            alpha[-1] = 1.0
             return alpha
-    alpha[-1] = 1.0
+    idx = best_group + [h]
+    alpha[idx] = select_weights(S[np.ix_(idx, idx)], np.zeros(len(idx)), 0.0)
     return alpha
 
 
@@ -277,6 +294,8 @@ class ODriftConfig:
     selection: str = "segment"   # "segment" | "mse" (debiased mixture MSE) | "bound" (worst-case)
     z_group: float = 3.0         # homogeneity test threshold between windows
     z_anchor: float = 2.0        # anchor veto threshold for a homogeneous group
+    fallback: str = "anchor"     # all groups vetoed -> "anchor" alone | "least" contradicted group + anchor
+    anchor_sn: bool = False      # self-normalized DR for the anchor component
     delta_variance: float = 0.025
     delta_bias: float = 0.025
     delta_diagnostics: float = 0.01
@@ -325,7 +344,8 @@ def build_components(history: list, anchor: LoggedData, X_target: np.ndarray, pi
     anchor_comp = None
     if anc_nuis is not None:
         anchor_comp = transported_dr(anchor, X_target, pi, n_actions, len(history), z_diag,
-                                     cfg.min_ess, same_distribution=True, nuis=anc_nuis)
+                                     cfg.min_ess, same_distribution=True, nuis=anc_nuis,
+                                     self_normalize=cfg.anchor_sn)
     return comps, anchor_comp
 
 
@@ -356,7 +376,7 @@ def combine(comps: list, anchor_comp, cfg: ODriftConfig, lam: float | None = Non
     z_k = norm.ppf(1 - cfg.delta_bias / (2 * len(keep))) if keep else 0.0
     B = bias_bounds(sel, sel_anchor, S_sel, z_k)
     if cfg.selection == "segment":
-        alpha = segment_select(sel, S_sel, cfg.z_group, cfg.z_anchor)
+        alpha = segment_select(sel, S_sel, cfg.z_group, cfg.z_anchor, cfg.fallback)
     elif cfg.selection == "mse":
         d_sel, C_sel = diff_moments(sel, S_sel)
         alpha = select_weights(S_sel, B, lam, Q=mse_objective(S_sel, d_sel, C_sel, lam))
