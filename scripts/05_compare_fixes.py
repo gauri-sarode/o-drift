@@ -26,15 +26,17 @@ PROTOCOL = yaml.safe_load((ROOT / "configs/protocol.yaml").read_text())
 SIM, DEV, TUNE = PROTOCOL["simulator"], PROTOCOL["splits"]["dev"], PROTOCOL["tuning"]
 CFG = ODriftConfig(delta_variance=TUNE["delta_split"]["variance"], delta_bias=TUNE["delta_split"]["bias"])
 Z_ANCHOR = [2.0, 2.5, 3.0]
-VARIANTS = list(itertools.product(Z_ANCHOR, ["anchor", "least"], [False, True]))
+FALLBACKS = ["anchor", "least"]
+SN = (False, True)
+Z_GROUP = None  # None -> dev-tuned value from results/tuned.json
 
 
-def name(za, fb, sn):
-    return f"za={za},fb={fb},sn={int(sn)}"
+def name(zg, za, fb, sn):
+    return f"zg={zg},za={za},fb={fb},sn={int(sn)}"
 
 
 def run_one(args):
-    regime_name, intensity, env_seed, data_seed, truths, z_group = args
+    regime_name, intensity, env_seed, data_seed, truths, z_groups = args
     env = EnvParams.sample(env_seed, d=SIM["d"], n_actions=SIM["n_actions"], misspec=SIM["misspec"])
     regime = REGIMES[regime_name](intensity, K=SIM["n_windows"])
     pis = [Policy.near_optimal(env, noise=s, seed=env_seed) for s in TUNE["candidate_policies"]]
@@ -43,13 +45,13 @@ def run_one(args):
     nuis = fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, env.n_actions, CFG, data_seed)
     out = {}
     for p_idx, pi in enumerate(pis):
-        for sn in (False, True):
-            cfg = replace(CFG, z_group=z_group, anchor_sn=sn)
+        for sn in SN:
+            cfg = replace(CFG, anchor_sn=sn)
             comps, anc = build_components(ep.history, ep.anchor, ep.target_contexts, pi, env.n_actions, cfg,
                                           nuisances=nuis)
-            for za, fb in itertools.product(Z_ANCHOR, ["anchor", "least"]):
-                r = combine(comps, anc, replace(cfg, z_anchor=za, fallback=fb))
-                out.setdefault(name(za, fb, sn), []).append(dict(err=r.value - truths[p_idx], hw=r.half_width,
+            for zg, za, fb in itertools.product(z_groups, Z_ANCHOR, FALLBACKS):
+                r = combine(comps, anc, replace(cfg, z_group=zg, z_anchor=za, fallback=fb))
+                out.setdefault(name(zg, za, fb, sn), []).append(dict(err=r.value - truths[p_idx], hw=r.half_width,
                                                                   anchor_only=r.weights.get(len(comps), 0) > 0.999))
     return out
 
@@ -57,16 +59,25 @@ def run_one(args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--reps", type=int, default=DEV["data_seeds"]["count"])
+    ap.add_argument("--z-group", type=float, nargs="*", default=None)
+    ap.add_argument("--z-anchor", type=float, nargs="*", default=None)
+    ap.add_argument("--fallback", nargs="*", default=None)
+    ap.add_argument("--sn", type=int, nargs="*", default=None)
+    ap.add_argument("--out", default="results/05_compare_fixes.json")
     args = ap.parse_args()
+    global Z_ANCHOR, FALLBACKS, SN
+    Z_ANCHOR = args.z_anchor or Z_ANCHOR
+    FALLBACKS = args.fallback or FALLBACKS
+    SN = tuple(bool(x) for x in args.sn) if args.sn is not None else SN
     dev = json.loads((ROOT / "results/03_dev.json").read_text())
     tuned = json.loads((ROOT / "results/tuned.json").read_text())
-    z_group = tuned["odrift"][0]
+    z_groups = args.z_group or [tuned["odrift"][0]]
     start = DEV["data_seeds"]["start"]
     summary = {}
     with ProcessPoolExecutor() as pool:
         for key, cell in dev["cells"].items():
             regime_name, intensity = key.split("@")[0], float(key.split("@")[1])
-            jobs = [(regime_name, intensity, e, start + s, cell["truths"][str(e)], z_group)
+            jobs = [(regime_name, intensity, e, start + s, cell["truths"][str(e)], z_groups)
                     for e in DEV["env_seeds"] for s in range(args.reps)]
             res = list(pool.map(run_one, jobs))
             summary[key] = {}
@@ -81,7 +92,7 @@ def main():
     for v in sorted(score, key=score.get):
         print(f"{v:28s}" + "".join(f"{summary[k][v]['rmse'] * 1e3:11.2f}" for k in summary) + f"   {score[v]:.3f}")
     print("(RMSE x1e3; fraction of anchor-only outputs stored in results/05_compare_fixes.json)")
-    (ROOT / "results/05_compare_fixes.json").write_text(json.dumps(dict(summary=summary, score=score), indent=2))
+    (ROOT / args.out).write_text(json.dumps(dict(summary=summary, score=score), indent=2))
 
 
 if __name__ == "__main__":

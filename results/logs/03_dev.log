@@ -1,3 +1,7 @@
 S0@0.0     n=200  best: pooled_dr=0.0054  recent_dr[12]=0.0054  minvar_dr=0.0054  decay_dr[0.95]=0.0055  decay_dr[0.9]=0.0058  oracle=0.0058
 S1@1.0     n=200  best: oracle=0.0066  transport_dr=0.0066  recent_dr[3]=0.0118  recent_dr[4]=0.0122  decay_dr[0.5]=0.0123  decay_dr[0.7]=0.0123
 S2@0.0     n=200  best: minvar_dr=0.0060  oracle=0.0065  transport_dr=0.0065  pooled_dr=0.0068  recent_dr[12]=0.0068  decay_dr[0.95]=0.0069
+S3a@0.5    n=200  best: oracle=0.0070  recent_dr[6]=0.0078  decay_dr[0.8]=0.0084  decay_dr[0.7]=0.0086  recent_dr[4]=0.0092  recent_dr[8]=0.0093
+S3b@0.5    n=200  best: oracle=0.0087  decay_dr[0.7]=0.0097  recent_dr[4]=0.0100  recent_dr[6]=0.0100  decay_dr[0.8]=0.0101  recent_dr[3]=0.0105
+S4@0.5     n=200  best: oracle=0.0133  minvar_dr=0.0133  pooled_dr=0.0136  recent_dr[12]=0.0136  decay_dr[0.95]=0.0149  decay_dr[0.9]=0.0166
+wrote /Users/gauris/dev/o-drift/results/03_dev.json
