@@ -77,7 +77,9 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
 3. **Reward-homogeneity grouping + anchor veto** (`selection="segment"`, default):
    after context transport and propensity correction, transported window values can
    only disagree through reward drift, and window-vs-window comparisons have
-   history-scale precision (sd ≈ 0.005) instead of anchor-scale (≈ 0.035). Take the
+   per-window precision (sd ≈ 0.015–0.03; group means tighter) instead of anchor-scale
+   (≈ 0.035–0.07). [Corrected 2026-10-22: an earlier note said 0.005 — that was the
+   pooled sd, not per-window.] Take the
    most recent homogeneous group the anchor does not contradict. Dev smoke: S0 0.0042
    (pooled 0.0046), S3a 0.0058 (oracle 0.0053).
    → This is the paper's core mechanism claim: *context and policy drift are removed by
@@ -97,3 +99,8 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
   our grouping step is an instance; cite as such rather than claim novelty for it.
 - Pre-test estimators (Bancroft 1944; Judge & Bock): the anchor veto is a pre-test;
   expect the known mid-intensity risk bump — report it.
+5. **Anchor false-veto failure (dev S1 diagnostic)**: grouping is correct (one group),
+   but heavy-tailed anchor estimates for noisy candidate policies trigger the veto
+   (e.g. anchor 0.600 vs group 0.465, z≈2.7) and the fallback is anchor-alone → large
+   error. Candidate fixes to compare on dev: higher z_anchor (already in grid), fallback
+   to least-contradicted group instead of anchor-only, robust (self-normalized) anchor.
