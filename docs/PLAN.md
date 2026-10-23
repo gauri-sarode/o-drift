@@ -165,3 +165,15 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    >=1.48x failure somewhere. S4 remains the weak cell (precise-but-biased old data).
    Still unlikely to meet the frozen per-cell 0.9x bar; the supportable claim is
    uniform near-optimality across drift mechanisms.
+12. **Drift-corrected reuse (2026-10-23) — fixes S4, first variant to beat the best
+   baselines.** Reference = newest monitor segment the anchor does not contradict;
+   windows outside it use the reference segment's model for the DM term and keep their
+   own residual correction (bias = misspecification difference between segment models;
+   zero when drift stays within the model class — state this assumption in the paper).
+   Then pool all eligible corrected windows + anchor at minimum variance.
+   Full dev (z_a=3, monitor α=0.001, segment models, ctx gate 0.01):
+   S0 5.62 | S1 6.42 | S2 6.16 | S3a 6.79 | S3b 9.59 | S4 11.72  (x1e-3)
+   ratio to per-cell best: 1.04 | 0.98 | 1.02 | 0.87 | 0.96 | 0.88; worst 1.04, mean 0.96.
+   On dev this meets the frozen go/no-go shape (S3a, S4 <= 0.90; S0-S2 <= 1.10) —
+   paired CIs still to be computed in the main evaluation. Shrink mode is dominated.
+   **Method work stops here** (deadline risk; dev-overfitting risk).
