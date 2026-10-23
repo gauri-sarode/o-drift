@@ -116,3 +116,15 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    Worst-case ratio to per-cell best (dev, optimistic): O-DRIFT z_g=2/z_a=3 1.54,
    transport DR 1.71, recent-6 2.01, decay-0.8 2.16, pooled 3.25.
    Self-normalized anchor: no effect.
+7. **Round 2 dev method work (2026-10-23)**: (a) change-point (binary segmentation)
+   grouping: small gain over greedy (S3a 12.3 -> 10.9). (b) model-based (DM) detection:
+   dropped — DM window values are as noisy as DR (Bernoulli noise x weights dominates;
+   SEs verified calibrated: empirical 0.0165 vs est. 0.0156). (c) Shrinkage w.r.t. the
+   detected segment: no effect (if no split is found the reference already contains the
+   drifted windows). (d) **Shrinkage w.r.t. the newest m windows + anchor** (debiased
+   MSE): best so far. m=6 wins the tuning rule (mean log RMSE -4.649):
+   S0 7.7, S1 8.1, S2 8.2, S3a 7.9, S3b 10.4, S4 18.4 (x1e-3).
+   Worst-case ratio to per-cell best: 1.43 (transport 1.71, recent-6 2.01, decay 2.16,
+   pooled 3.25); mean ratio 1.24 (transport 1.29, decay 1.38, recent-6 1.45).
+   Still not best in any single cell. Caveat: many O-DRIFT variants were explored on
+   dev, so its dev robustness is optimistic; the test split is the honest check.
