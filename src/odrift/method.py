@@ -406,6 +406,7 @@ class ODriftResult:
     bounds: dict                 # component index -> Bbar
     reasons: dict                # window index -> reason codes for ineligible windows
     z_v: float = 1.96
+    se_hetero: float | None = None  # DL-inflated SE (informative, not certified)
 
     def interval(self) -> tuple:
         return self.value - self.half_width, self.value + self.half_width
@@ -620,7 +621,9 @@ def odrift_corrected(history: list, anchor: LoggedData, X_target: np.ndarray, pi
     comps_c, anc_c = build_components(history, anchor, X_target, pi, n_actions, cfg, nuisances=nuisances,
                                       reference_windows=ref_segment)
     if mode == "pool":
-        return combine(comps_c, anc_c, replace(cfg, **POOL))
+        res = combine(comps_c, anc_c, replace(cfg, **POOL))
+        res.se_hetero = heterogeneity_se(res, comps_c, anc_c)
+        return res
     return combine(comps_c, anc_c, replace(cfg, selection="shrink"), 1.0,
                    window_groups=[ref_segment] + [s for s in segments if s is not ref_segment])
 
@@ -657,3 +660,28 @@ def odrift_corrected_split(split: tuple, pi, n_actions: int, cfg: ODriftConfig) 
         c_e.diagnostics.reasons = c_s.diagnostics.reasons
     pool_cfg = replace(cfg, **POOL) if ref_segment is not None else cfg
     return combine(est_c[0], est_c[1], pool_cfg, bound_comps=sel_c)
+
+
+def heterogeneity_se(res: ODriftResult, comps: list, anc: Component) -> float:
+    """SE of a pooled O-DRIFT estimate inflated by DerSimonian-Laird between-window
+    heterogeneity tau^2 among the eligible historical components (anchor excluded).
+
+    Not a certified interval: it absorbs residual disagreement between corrected
+    windows (imperfect correction, within-segment drift) but cannot see bias that is
+    common to all windows -- only current outcomes can (cf. the anchor-limited
+    certified interval).
+    """
+    keep = [c for c in comps if c.diagnostics.eligible] + [anc]
+    alpha = np.array([res.weights.get(c.index, 0.0) for c in keep])
+    S = covariance(keep)
+    h = len(keep) - 1
+    if h < 2:
+        return res.se
+    v = np.array([c.value for c in keep[:h]])
+    w = 1 / np.diag(S)[:h]
+    m = (w * v).sum() / w.sum()
+    Q = (w * (v - m) ** 2).sum()
+    tau2 = max(0.0, (Q - (h - 1)) / (w.sum() - (w ** 2).sum() / w.sum()))
+    S = S.copy()
+    S[:h, :h] += tau2 * np.eye(h)
+    return float(np.sqrt(max(alpha @ S @ alpha, 0.0)))

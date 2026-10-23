@@ -181,3 +181,15 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    z_anchor 3-5 all give ratios ~1.04/0.98/1.02/0.85-0.87/0.93-0.96/0.86-0.88 (mean 0.95);
    α=0.01 slightly worse in S4 (0.96). No knife-edge tuning. Formal selection by the
    protocol rule happens in the full 03_evaluate dev run.
+14. **Intervals (2026-10-23)**. Split-half certified bound is vacuous (half-width ~0.21,
+   2.5x anchor-only). Prototype on dev (240 policy-episodes/cell):
+   - certified: anchor DR with a history-trained model (= Liu et al. regression-assisted
+     DR) -> coverage 0.92-0.93, half-width 0.076 (anchor-limited floor; cite Liu, not ours).
+   - informative: O-DRIFT SE inflated by DerSimonian-Laird between-window tau^2 ->
+     coverage 0.93-0.95 without reward drift (hw ~0.012), 0.91 / 0.78 / 0.85 in S3a / S3b / S4
+     (pooled DR 0.56 / 0.52 / 0.86). Residual S3b gap = bias common to the reference
+     segment, visible only to the anchor.
+   Reporting: point estimates headline; both interval types reported; split-half bound
+   relabelled as an ablation. The FROZEN go/no-go coverage criterion (split coverage
+   >= 0.93) is kept unchanged and reported as-is, with the explicit note that it passes
+   only because the split bound is vacuous.

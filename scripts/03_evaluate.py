@@ -142,7 +142,8 @@ def run_one(args):
             r = odrift_corrected(ep.history, ep.anchor, ep.target_contexts, pi, A, replace(CFG, z_anchor=za),
                                  seg_nuis[m], segments[m])
             deficient = [k for k, reasons in r.reasons.items() if "target_support" in reasons]
-            put(f"odrift[{m},{za}]", r.value, r.half_width, hw_narrow=float(r.z_v * r.se),
+            hw_re = Z95 * (r.se_hetero if r.se_hetero is not None else r.se)
+            put(f"odrift[{m},{za}]", r.value, hw_re, hw_narrow=float(Z95 * r.se), hw_certified_bound=float(r.half_width),
                 status=r.status, weights=[r.weights.get(k, 0.0) for k in range(K + 1)],
                 deficient=deficient, ineligible=sorted(r.reasons), n_segments=len(segments[m]))
         # oracle selector: true transfer biases, same components

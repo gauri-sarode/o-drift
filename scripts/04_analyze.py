@@ -138,10 +138,16 @@ def main():
         d, lo, hi = paired_bootstrap(cell, od, base)
         ratio = rmse(cell, od) / rmse(cell, base)
         cov = coverage(cell, ods)
+        liu = name("liu", "liu_reg")
         summary[key] = dict(best_baseline=base, diff=d, ci=[lo, hi], ratio=ratio, coverage_split=cov,
-                            coverage_plugin_narrow=coverage(cell, od, "hw_narrow"))
+                            coverage_hetero=coverage(cell, od), halfwidth_hetero=float(np.mean(per_rep(cell, od, "hw"))),
+                            coverage_plugin_narrow=coverage(cell, od, "hw_narrow"),
+                            coverage_certified_liu=coverage(cell, liu),
+                            halfwidth_certified_liu=float(np.mean(per_rep(cell, liu, "hw"))))
         print(f"  {key:10s} vs {base:18s} diff={d * 1e3:+6.2f}e-3 CI=[{lo * 1e3:+6.2f},{hi * 1e3:+6.2f}] "
-              f"ratio={ratio:.2f}  cov(split)={cov:.3f}  cov(narrow)={summary[key]['coverage_plugin_narrow']:.3f}")
+              f"ratio={ratio:.2f}  cov(hetero)={summary[key]['coverage_hetero']:.3f}"
+              f"[hw {summary[key]['halfwidth_hetero'] * 1e3:.1f}]  cov(narrow)={summary[key]['coverage_plugin_narrow']:.3f}"
+              f"  cov(certified Liu)={summary[key]['coverage_certified_liu']:.3f}[hw {summary[key]['halfwidth_certified_liu'] * 1e3:.1f}]")
 
     if args.split == "test":
         go = []
