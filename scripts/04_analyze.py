@@ -151,6 +151,20 @@ def main():
         stat = [k for k in summary if k.split("@")[0] in ("S0", "S1", "S2")]
         go.append(("RMSE <= 1.1x best in S0/S1/S2", all(summary[k]["ratio"] <= 1.10 for k in stat)))
         go.append(("coverage(split) >= 0.93 everywhere", all(summary[k]["coverage_split"] >= 0.93 for k in summary)))
+        s7 = [k for k in data["cells"] if k.startswith("S7@")]
+        if s7:
+            cell = data["cells"][s7[0]]
+            frac_ok = np.mean([sum(p["weights"][w] for w in p["deficient"]) <= 0.05
+                               for r in cell["reps"] for p in r[od]])
+            go.append((f"S7: weight on support-deficient windows <= 0.05 in >= 90% (got {frac_ok:.3f})", frac_ok >= 0.90))
+        no_anchor = ROOT / "results/03_test_anchor0.json"
+        if no_anchor.exists():
+            na = json.loads(no_anchor.read_text())
+            statuses = [p["status"] for c in na["cells"].values() for r in c["reps"] for p in r["odrift"]]
+            frac = np.mean([s_ == "not_certified" for s_ in statuses])
+            go.append((f"no anchor -> not certified in 100% (got {frac:.3f})", frac == 1.0))
+        else:
+            go.append(("no-anchor run missing (run 03_evaluate --split test --n-anchor 0)", False))
         for crit, ok in go:
             print(f"  [{'PASS' if ok else 'FAIL'}] {crit}")
         (ROOT / "results/04_test_summary.json").write_text(json.dumps(dict(summary=summary, go=go), indent=2))
