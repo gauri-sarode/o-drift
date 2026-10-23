@@ -128,3 +128,11 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    pooled 3.25); mean ratio 1.24 (transport 1.29, decay 1.38, recent-6 1.45).
    Still not best in any single cell. Caveat: many O-DRIFT variants were explored on
    dev, so its dev robustness is optimistic; the test split is the honest check.
+8. **S4 diagnosis + evidence-based reference (2026-10-23)**: in S4 the oldest windows
+   (logger A) are the most precise (sd ~0.02, ESS ~500) and also the reward-shifted ones
+   (b 0.013-0.034); recent windows are 2-3x noisier (ESS 45-150). Minimum-variance
+   weighting concentrates ~70% weight on the precise biased windows (transport DR 19.8),
+   whereas pooled DR's per-record weighting dilutes the bias (13.6). A cumulative-ESS
+   reference (targets 1500/3000/4500) did not help (S4 18.7-19.9 vs shrink-6 18.4): the
+   reference grows into the old windows and inherits the same problem. Same information
+   limit as S3a — b below reference noise. shrink-6 remains the tuning-rule winner.
