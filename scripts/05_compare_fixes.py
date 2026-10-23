@@ -37,7 +37,7 @@ def name(zg, za, fb, sn):
 
 
 def run_one(args):
-    regime_name, intensity, env_seed, data_seed, truths, z_groups, z_anchors, fallbacks, sns, groupings, shrink_refs, shrink_ess, MONITOR_ALPHAS, CONTEXT_ALPHAS, SEG_MODELS, CORRECTED = args
+    regime_name, intensity, env_seed, data_seed, truths, z_groups, z_anchors, fallbacks, sns, groupings, shrink_refs, shrink_ess, MONITOR_ALPHAS, CONTEXT_ALPHAS, SEG_MODELS, CORRECTED, POOL_ONLY = args
     env = EnvParams.sample(env_seed, d=SIM["d"], n_actions=SIM["n_actions"], misspec=SIM["misspec"])
     regime = REGIMES[regime_name](intensity, K=SIM["n_windows"])
     pis = [Policy.near_optimal(env, noise=s, seed=env_seed) for s in TUNE["candidate_policies"]]
@@ -46,10 +46,12 @@ def run_one(args):
     stats = ResidualStats(ep.history, env.n_actions) if MONITOR_ALPHAS else None
     monitor_groups = {a: reward_changepoints(stats, a) for a in MONITOR_ALPHAS}
     seg_models = SEG_MODELS and MONITOR_ALPHAS
-    nuis_by_ctx = {ca: fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, env.n_actions,
-                                         replace(CFG, context_alpha=ca), data_seed,
-                                         segments=monitor_groups[MONITOR_ALPHAS[0]] if seg_models else None)
-                   for ca in CONTEXT_ALPHAS}
+    # per-(context alpha, monitor alpha) nuisances: segment models depend on the segments
+    nuis_by = {(ca, a): fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, env.n_actions,
+                                          replace(CFG, context_alpha=ca), data_seed,
+                                          segments=monitor_groups[a] if seg_models else None)
+               for ca in CONTEXT_ALPHAS for a in (MONITOR_ALPHAS or [None])}
+    nuis_by_ctx = {ca: nuis_by[(ca, (MONITOR_ALPHAS or [None])[0])] for ca in CONTEXT_ALPHAS}
     out = {}
     for p_idx, pi in enumerate(pis):
         for sn, ca in itertools.product(sns, CONTEXT_ALPHAS):
@@ -74,9 +76,9 @@ def run_one(args):
                 for a, wg in monitor_groups.items():
                     if not (CORRECTED and seg_models) or gr != groupings[0] or zg != z_groups[0]:
                         continue
-                    for mode in ("pool", "shrink"):
+                    for mode in (("pool",) if POOL_ONLY else ("pool", "shrink")):
                         r = odrift_corrected(ep.history, ep.anchor, ep.target_contexts, pi, env.n_actions,
-                                             replace(cfg, z_anchor=za, fallback=fb), nuis_by_ctx[ca], wg, mode)
+                                             replace(cfg, z_anchor=za, fallback=fb), nuis_by[(ca, a)], wg, mode)
                         out.setdefault(f"CORR-{mode}:mon{a}:za={za},fb={fb}{sfx}", []).append(
                             dict(err=r.value - truths[p_idx], hw=r.half_width, anchor_only=False))
                 for m in shrink_refs:
@@ -106,6 +108,7 @@ def main():
     ap.add_argument("--context-alpha", type=float, nargs="*", default=[0.0])
     ap.add_argument("--segment-models", action="store_true", help="one reward model per monitor segment")
     ap.add_argument("--corrected", action="store_true", help="drift-corrected reuse variants")
+    ap.add_argument("--pool-only", action="store_true", help="corrected variants: pool mode only, skip others")
     ap.add_argument("--out", default="results/05_compare_fixes.json")
     args = ap.parse_args()
     global Z_ANCHOR, FALLBACKS, SN
@@ -120,7 +123,7 @@ def main():
     with ProcessPoolExecutor() as pool:
         for key, cell in dev["cells"].items():
             regime_name, intensity = key.split("@")[0], float(key.split("@")[1])
-            jobs = [(regime_name, intensity, e, start + s, cell["truths"][str(e)], z_groups, Z_ANCHOR, FALLBACKS, SN, args.grouping, args.shrink_ref, args.shrink_ess, args.monitor_alpha, args.context_alpha, args.segment_models, args.corrected)
+            jobs = [(regime_name, intensity, e, start + s, cell["truths"][str(e)], z_groups, Z_ANCHOR, FALLBACKS, SN, args.grouping, args.shrink_ref, args.shrink_ess, args.monitor_alpha, args.context_alpha, args.segment_models, args.corrected, args.pool_only)
                     for e in DEV["env_seeds"] for s in range(args.reps)]
             res = list(pool.map(run_one, jobs))
             summary[key] = {}
