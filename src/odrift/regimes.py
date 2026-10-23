@@ -107,9 +107,16 @@ def s8_misspecified_drift(intensity: float, K: int = K_DEFAULT) -> Regime:
                                          **LOGGER_C) for k in range(K)), WindowSpec(**LOGGER_C))
 
 
+def s8b_out_of_class_drift(intensity: float, K: int = K_DEFAULT) -> Regime:
+    """S8 without the per-action intercept: drift is purely out of the reward-model class
+    and may be invisible to the per-action residual monitor. Stress test (where it breaks)."""
+    return Regime("S8b", tuple(WindowSpec(reward_shift=intensity if k < K // 2 else 0.0, drift_nonlinear=1.0,
+                                          drift_intercept=0.0, **LOGGER_C) for k in range(K)), WindowSpec(**LOGGER_C))
+
+
 REGIMES = {
     "S0": s0_stationary, "S1": s1_covariate, "S2": s2_logger,
-    "S8": s8_misspecified_drift,
+    "S8": s8_misspecified_drift, "S8b": s8b_out_of_class_drift,
     "S3a": s3_reward_abrupt, "S3b": s3_reward_gradual, "S4": s4_mixed,
     "S5": s5_seasonal, "S6": s6_missing_metadata, "S7": s7_support_loss,
 }

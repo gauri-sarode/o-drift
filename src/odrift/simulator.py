@@ -69,10 +69,11 @@ class EnvParams:
         """Reward-drift logits for all actions, shape (n, A)."""
         return X @ self.G + self.gb
 
-    def h(self, X: np.ndarray) -> np.ndarray:
+    def h(self, X: np.ndarray, intercept: float = 1.0) -> np.ndarray:
         """Out-of-class reward-drift logits (interaction of two directions), shape (n, A).
-        Not representable by the per-action linear reward model."""
-        return self.gb + 2.0 * np.tanh(X @ self.G) * np.tanh(X @ self.H)
+        Not representable by the per-action linear reward model; intercept = 0 drops the
+        in-class per-action intercept, leaving only the out-of-class part (S8b)."""
+        return intercept * self.gb + 2.0 * np.tanh(X @ self.G) * np.tanh(X @ self.H)
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,7 @@ class WindowSpec:
     context_shift: float = 0.0   # c_k
     reward_shift: float = 0.0    # r_k
     drift_nonlinear: float = 0.0  # nu_k: drift direction (1 - nu) g + nu h (S8)
+    drift_intercept: float = 1.0  # weight of the per-action intercept inside h (S8b: 0)
     logger_id: int = 0           # l(k)
     logger_beta: float = 1.0     # beta_k (greediness)
     logger_eps: float = 0.2      # eps_k (uniform exploration)
@@ -104,7 +106,7 @@ class Regime:
 
 def q(env: EnvParams, spec: WindowSpec, X: np.ndarray) -> np.ndarray:
     drift = env.g(X) if not spec.drift_nonlinear else \
-        (1 - spec.drift_nonlinear) * env.g(X) + spec.drift_nonlinear * env.h(X)
+        (1 - spec.drift_nonlinear) * env.g(X) + spec.drift_nonlinear * env.h(X, spec.drift_intercept)
     return expit(env.f(X) + spec.reward_shift * drift)
 
 
