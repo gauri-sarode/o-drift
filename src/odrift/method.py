@@ -403,6 +403,8 @@ class ODriftConfig:
     context_alpha: float = 0.0   # > 0: density-ratio transport only for windows whose context-shift test rejects
     balanced: bool = False       # pool each reward segment with balanced (mixture) propensities
     joint_segments: bool = False  # segment reward models: one joint fit (shared base + per-segment offsets)
+    segment_trend: str = ""       # joint fit only: "" none | "segment" per-segment slope | "shared" one
+                                  # within-segment slope common to all segments; evaluated at the target time
     anchor_sn: bool = False      # self-normalized DR for the anchor component
     delta_variance: float = 0.025
     delta_bias: float = 0.025
@@ -475,9 +477,18 @@ def _joint_segment_nuisances(history: list, X_target: np.ndarray, n_actions: int
     sid = np.array([seg_of[k] for k in pooled.window])
     J, M = len(segments), len(X_target)
 
-    def feats(X, A, s_ids):
+    t_all = pooled.window / len(history)  # target / anchor time = 1
+
+    def feats(X, A, s_ids, t):
         base = _features(X, A, n_actions)
-        return np.hstack([base] + [base * (s_ids == j)[:, None] for j in range(1, J)])
+        cols = [base] + [base * (s_ids == j)[:, None] for j in range(1, J)]
+        if cfg.segment_trend == "segment":  # within-segment drift linear in time (gradual drift)
+            cols += [base * ((s_ids == j) * t)[:, None] for j in range(J)]
+        elif cfg.segment_trend == "shared":  # one slope, identified within segments (offsets absorb levels)
+            cols += [base * t[:, None]]
+        elif cfg.segment_trend:
+            raise ValueError(cfg.segment_trend)
+        return np.hstack(cols)
 
     folds = np.random.default_rng(seed).permutation(len(pooled)) % 2
     q_src = np.empty((len(pooled), n_actions))
@@ -486,12 +497,12 @@ def _joint_segment_nuisances(history: list, X_target: np.ndarray, n_actions: int
     for f in range(2):
         tr = folds != f
         model = LogisticRegression(C=1.0, max_iter=3000, fit_intercept=False)
-        model.fit(feats(pooled.X[tr], pooled.A[tr], sid[tr]), pooled.R[tr])
+        model.fit(feats(pooled.X[tr], pooled.A[tr], sid[tr], t_all[tr]), pooled.R[tr])
         te = np.where(~tr)[0]
         for a in range(n_actions):
-            q_src[te, a] = model.predict_proba(feats(pooled.X[te], np.full(len(te), a), sid[te]))[:, 1]
+            q_src[te, a] = model.predict_proba(feats(pooled.X[te], np.full(len(te), a), sid[te], t_all[te]))[:, 1]
         for j in range(J):
-            q_tgt[j] += model.predict_proba(feats(Xr, Ar, np.full(len(Ar), j)))[:, 1].reshape(n_actions, M).T / 2
+            q_tgt[j] += model.predict_proba(feats(Xr, Ar, np.full(len(Ar), j), np.ones(len(Ar))))[:, 1].reshape(n_actions, M).T / 2
     hist = []
     for k, d in enumerate(history):
         shift = cfg.context_alpha <= 0 or context_shift_pvalue(d.X, X_target) < cfg.context_alpha

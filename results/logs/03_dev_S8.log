@@ -1,0 +1,2 @@
+S8@0.5     n=200  best: oracle=0.0066  odrift[0.0001,5.0,1]=0.0067  odrift[0.0001,4.0,1]=0.0067  odrift[0.0001,3.5,1]=0.0067  odrift[0.0001,5.0,0]=0.0067  odrift[0.0001,4.0,0]=0.0067
+wrote /Users/gauris/dev/o-drift/results/03_dev_S8_diagnostic.json

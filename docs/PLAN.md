@@ -232,3 +232,14 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    time-aware DR -4.53 -> no single baseline is competitive everywhere; time-aware DR wins
    only where drift is exactly linear in time (its own model class) and is 2x worse in S4,
    coverage 0.69-0.78. Report S3b as a stated loss. Results: results/03_dev.json (v5).
+18. **S3b fix attempt: within-segment time trend (2026-10-24) — rejected**. Joint segment
+   model + linear time term evaluated at the target time, per-segment slope or one shared
+   within-segment slope (scripts/06, full dev seeds, results/06_trend.json). RMSE x1e3
+   joint / per-seg trend / shared trend: S0 5.53/8.83/8.83, S1 6.18/10.01/10.01,
+   S2 5.23/9.50/9.50, S3a 6.46/9.90/9.15, S3b 9.44/10.23/9.99, S4 10.26/18.77/16.69,
+   S8 6.70/10.25/9.22. The trend removes S3b's bias (+3.9 -> +0.5/+1.2) but extrapolation
+   variance from history-only fits outweighs it in every cell, S3b included, so a gated
+   (pre-tested) trend cannot beat time-aware DR (8.44) either. Not added to the grid; option
+   kept in code as a documented negative result. Likely reason time-aware DR wins S3b: its
+   time model is fit with the anchor at t = 1 (interpolation, not extrapolation) and its
+   global linear-in-time model is exactly S3b's drift. S3b reported as a stated loss.

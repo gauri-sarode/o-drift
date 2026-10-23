@@ -26,6 +26,10 @@ CFG = ODriftConfig(delta_variance=TUNE["delta_split"]["variance"], delta_bias=TU
                    **TUNE["odrift_fixed"], z_anchor=TUNED[1])
 
 
+VARIANTS = (("separate", False, ""), ("joint", True, ""), ("joint_trend", True, "segment"),
+            ("joint_shared_trend", True, "shared"))
+
+
 def truths(regime_name, intensity, e):
     env = EnvParams.sample(e, d=SIM["d"], n_actions=SIM["n_actions"], misspec=SIM["misspec"])
     reg = REGIMES[regime_name](intensity, K=SIM["n_windows"])
@@ -42,8 +46,8 @@ def run_one(args):
     fns = [lambda X, a=(sp if sp.recorded_logger_id is None else replace(sp, logger_id=sp.recorded_logger_id)):
            mu(env, a, X) for sp in reg.windows]
     out = {}
-    for name, joint in (("separate", False), ("joint", True)):
-        cfg = replace(CFG, joint_segments=joint)
+    for name, joint, trend in VARIANTS:
+        cfg = replace(CFG, joint_segments=joint, segment_trend=trend)
         nuis = fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, env.n_actions, cfg, seed, segments=segs)
         out[name] = [odrift_balanced(ep.history, ep.anchor, ep.target_contexts, Policy.near_optimal(env, noise=s, seed=e),
                                      env.n_actions, cfg, nuis, segs, fns).value - v for s, v in zip(TUNE["candidate_policies"], vt)]
@@ -65,10 +69,10 @@ def main():
             out = list(pool.map(run_one, jobs))
             env = np.array([j[2] for j in jobs])
             res[cell] = {}
-            for v in ("separate", "joint"):
+            for v in [n for n, _, _ in VARIANTS]:
                 err = np.array([o[v] for o in out])
                 res[cell][v] = dict(rmse=float(np.sqrt((err ** 2).mean())), bias=float(err.mean()),
-                                    rmse_env=[float(np.sqrt((err[env == e] ** 2).mean())) for e in DEV["env_seeds"]])
+                                    errs=err.tolist(), rmse_env=[float(np.sqrt((err[env == e] ** 2).mean())) for e in DEV["env_seeds"]])
             print(cell, {v: (round(d["rmse"] * 1e3, 2), round(d["bias"] * 1e3, 2), [round(x * 1e3, 1) for x in d["rmse_env"]])
                          for v, d in res[cell].items()}, flush=True)
     (ROOT / args.out).write_text(json.dumps(res, indent=2))
