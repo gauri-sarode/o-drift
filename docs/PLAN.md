@@ -177,3 +177,7 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    On dev this meets the frozen go/no-go shape (S3a, S4 <= 0.90; S0-S2 <= 1.10) —
    paired CIs still to be computed in the main evaluation. Shrink mode is dominated.
    **Method work stops here** (deadline risk; dev-overfitting risk).
+13. Final O-DRIFT hyperparameter sweep (dev): flat surface. Monitor α 1e-4/1e-3 and
+   z_anchor 3-5 all give ratios ~1.04/0.98/1.02/0.85-0.87/0.93-0.96/0.86-0.88 (mean 0.95);
+   α=0.01 slightly worse in S4 (0.96). No knife-edge tuning. Formal selection by the
+   protocol rule happens in the full 03_evaluate dev run.
