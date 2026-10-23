@@ -443,14 +443,31 @@ def fit_all_nuisances(history: list, anchor: LoggedData, X_target: np.ndarray, n
 
 
 def build_components(history: list, anchor: LoggedData, X_target: np.ndarray, pi, n_actions: int,
-                     cfg: ODriftConfig, seed: int = 0, nuisances: tuple | None = None) -> tuple:
-    """Transported DR components for every window plus the anchor (or None)."""
+                     cfg: ODriftConfig, seed: int = 0, nuisances: tuple | None = None,
+                     reference_windows: list | None = None) -> tuple:
+    """Transported DR components for every window plus the anchor (or None).
+
+    reference_windows (drift-corrected reuse): windows of the newest reward-
+    homogeneous segment, whose shared reward model supplies the direct-method
+    term for EVERY window. Windows outside it keep only their own residual
+    correction w rho (R - q_own), so their rewards enter through their own
+    model's misspecification, not their (drifted) level:
+        V_k^corr = mean_j m_ref(X*_j) + mean_i w rho (R_i - q_own(X_i, A_i)),
+    with bias equal to the difference in misspecification between the two
+    segment models on P_T -- zero when the drift stays within the model class.
+    """
     if nuisances is None:
         nuisances = fit_all_nuisances(history, anchor, X_target, n_actions, cfg, seed)
     hist_nuis, anc_nuis = nuisances
     z_diag = norm.ppf(1 - cfg.delta_diagnostics / (2 * (len(history) + 1)))
     comps = [transported_dr(d, X_target, pi, n_actions, k, z_diag, cfg.min_ess, nuis=nu)
              for k, (d, nu) in enumerate(zip(history, hist_nuis))]
+    if reference_windows:
+        dm_ref = (pi.probs(X_target) * hist_nuis[reference_windows[0]].q_tgt).sum(axis=1)
+        for c in comps:
+            if c.index not in reference_windows:
+                c.dm_scores = dm_ref
+                c.value = float(dm_ref.mean() + c.corr_scores.mean())
     anchor_comp = None
     if anc_nuis is not None:
         anchor_comp = transported_dr(anchor, X_target, pi, n_actions, len(history), z_diag,
@@ -565,3 +582,34 @@ def odrift(history: list, anchor: LoggedData, X_target: np.ndarray, pi, n_action
         return {lam: combine(comps, anc, cfg, lam) for lam in lams}
     sp = make_split(history, anchor, X_target, n_actions, cfg, seed)
     return {lam: odrift_split(sp, pi, n_actions, replace(cfg, lam=lam)) for lam in lams}
+
+
+def odrift_corrected(history: list, anchor: LoggedData, X_target: np.ndarray, pi, n_actions: int,
+                     cfg: ODriftConfig, nuisances: tuple, segments: list, mode: str = "pool") -> ODriftResult:
+    """Full O-DRIFT with drift-corrected reuse.
+
+    1. Reference segment: the newest reward-monitor segment that the anchor does
+       not contradict (least-contradicted fallback), chosen on uncorrected components.
+    2. Every window outside the reference is drift-corrected (reference model's
+       direct-method term + its own residual correction; see build_components).
+    3. mode="pool": all eligible corrected windows + anchor at minimum variance;
+       mode="shrink": debiased-MSE shrinkage toward the reference segment.
+    """
+    comps, anc = build_components(history, anchor, X_target, pi, n_actions, cfg, nuisances=nuisances)
+    if anc is None:
+        return combine(comps, None, cfg)
+    keep = [i for i, c in enumerate(comps) if c.diagnostics.eligible]
+    sel = [comps[i] for i in keep] + [anc]
+    pos = {comps[i].index: j for j, i in enumerate(keep)}
+    groups = [g for g in ([pos[k] for k in grp if k in pos] for grp in segments) if g]
+    alpha_ref = segment_select(sel, covariance(sel), cfg.z_group, cfg.z_anchor, cfg.fallback, groups=groups)
+    ref_windows = [sel[j].index for j in np.flatnonzero(alpha_ref[:-1] > 0)]
+    if not ref_windows:  # anchor alone: nothing to correct toward
+        return combine(comps, anc, cfg, window_groups=segments)
+    ref_segment = next(seg for seg in segments if ref_windows[0] in seg)
+    comps_c, anc_c = build_components(history, anchor, X_target, pi, n_actions, cfg, nuisances=nuisances,
+                                      reference_windows=ref_segment)
+    if mode == "pool":
+        return combine(comps_c, anc_c, replace(cfg, selection="segment", z_group=np.inf, z_anchor=np.inf))
+    return combine(comps_c, anc_c, replace(cfg, selection="shrink"), 1.0,
+                   window_groups=[ref_segment] + [s for s in segments if s is not ref_segment])

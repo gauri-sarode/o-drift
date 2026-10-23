@@ -125,3 +125,20 @@ def test_segment_reward_models_unbiased_in_stationary_history():
     r = combine(comps, anc, cfg)
     truth = true_value(ENV, PI, regime.target, regime.target)
     assert abs(r.value - truth) < 4 * r.se
+
+
+def test_drift_corrected_reuse_removes_reward_bias_of_old_windows():
+    from odrift.method import ODriftConfig, fit_all_nuisances, odrift_corrected
+    from odrift.monitor import ResidualStats, reward_changepoints
+    regime = REGIMES["S3a"](1.0)
+    truth = true_value(ENV, PI, regime.target, regime.target)
+    errs = []
+    for seed in range(4):
+        ep = sample_episode(ENV, regime, 4000, 1000, 8000, seed=seed)
+        segs = reward_changepoints(ResidualStats(ep.history, ENV.n_actions), 0.001)
+        cfg = ODriftConfig(z_anchor=3.0, fallback="least")
+        nuis = fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, ENV.n_actions, cfg, segments=segs)
+        r = odrift_corrected(ep.history, ep.anchor, ep.target_contexts, PI, ENV.n_actions, cfg, nuis, segs)
+        assert sum(r.weights.get(k, 0) for k in range(6)) > 0.2  # old windows are reused
+        errs.append(r.value - truth)
+    assert abs(np.mean(errs)) < 0.01
