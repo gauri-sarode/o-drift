@@ -1,0 +1,14 @@
+S0@0.0
+S1@1.0
+S2@0.0
+S3a@0.5
+S3b@0.5
+S4@0.5
+
+variant                                          S0@0.0     S1@1.0     S2@0.0    S3a@0.5    S3b@0.5     S4@0.5   meanlog
+shrink6:ch:zg=3.5,za=3.0,fb=least,sn=0             7.70       8.05       8.21       7.90      10.38      18.43   -4.649
+shrinkESS3000:ch:zg=3.5,za=3.0,fb=least,sn=0       7.56       7.68       7.75       8.79      10.70      19.85   -4.634
+ch:zg=3.5,za=3.0,fb=least,sn=0                     6.23       7.15       6.94      10.87      13.40      19.99   -4.623
+shrinkESS4500:ch:zg=3.5,za=3.0,fb=least,sn=0       6.72       6.92       6.93      11.50      12.46      19.81   -4.620
+shrinkESS1500:ch:zg=3.5,za=3.0,fb=least,sn=0       9.01       9.45       9.35       9.38      10.41      18.66   -4.543
+(RMSE x1e3; fraction of anchor-only outputs stored in results/05_compare_fixes.json)

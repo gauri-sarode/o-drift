@@ -95,3 +95,20 @@ def test_changepoint_keeps_stationary_history_whole():
     comps, _ = build_components(ep.history, ep.anchor, ep.target_contexts, PI, ENV.n_actions, ODriftConfig())
     groups = changepoint_groups(np.array([c.value for c in comps]), covariance(comps), 3.0)
     assert len(groups) == 1, groups
+
+
+def test_reward_monitor_no_false_split_under_context_shift_and_finds_reward_split():
+    from odrift.monitor import ResidualStats, reward_changepoints
+    ep = sample_episode(ENV, REGIMES["S1"](1.0), 5000, 100, 100, seed=0)
+    assert len(reward_changepoints(ResidualStats(ep.history, ENV.n_actions), 0.001)) == 1
+    ep = sample_episode(ENV, REGIMES["S3a"](0.5), 5000, 100, 100, seed=0)
+    segs = reward_changepoints(ResidualStats(ep.history, ENV.n_actions), 0.001)
+    assert sorted(segs[0]) == list(range(6, 12)), segs
+
+
+def test_combine_with_monitor_groups_drops_reward_shifted_windows():
+    from odrift.method import ODriftConfig, build_components, combine
+    ep = sample_episode(ENV, REGIMES["S3a"](1.0), 4000, 1000, 4000, seed=0)
+    comps, anc = build_components(ep.history, ep.anchor, ep.target_contexts, PI, ENV.n_actions, ODriftConfig())
+    r = combine(comps, anc, ODriftConfig(fallback="least"), window_groups=[list(range(6, 12)), list(range(6))])
+    assert sum(r.weights.get(k, 0) for k in range(6)) < 1e-6

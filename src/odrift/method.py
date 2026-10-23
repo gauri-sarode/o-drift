@@ -288,7 +288,7 @@ def changepoint_groups(values: np.ndarray, S: np.ndarray, z_crit: float) -> list
 
 
 def segment_select(comps: list, S: np.ndarray, z_group: float, z_anchor: float,
-                   fallback: str = "anchor", grouping: str = "greedy") -> np.ndarray:
+                   fallback: str = "anchor", grouping: str = "greedy", groups: list | None = None) -> np.ndarray:
     """Weights over `comps` (anchor last): the most recent homogeneous group
     that the anchor does not contradict, pooled with the anchor at minimum
     variance. If every group is contradicted, fall back to the anchor alone
@@ -300,8 +300,10 @@ def segment_select(comps: list, S: np.ndarray, z_group: float, z_anchor: float,
         return alpha
     values = np.array([c.value for c in comps])
     best_z, best_group = np.inf, None
-    grouper = changepoint_groups if grouping == "changepoint" else homogeneous_groups
-    for group in grouper(values[:h], S[:h, :h], z_group):
+    if groups is None:
+        grouper = changepoint_groups if grouping == "changepoint" else homogeneous_groups
+        groups = grouper(values[:h], S[:h, :h], z_group)
+    for group in groups:
         w = select_weights(S[np.ix_(group, group)], np.zeros(len(group)), 0.0)
         diff = w @ values[group] - values[h]
         var = w @ S[np.ix_(group, group)] @ w + S[h, h] - 2 * w @ S[group, h]
@@ -320,7 +322,7 @@ def segment_select(comps: list, S: np.ndarray, z_group: float, z_anchor: float,
     return alpha
 
 
-def shrink_select(comps: list, S: np.ndarray, cfg, lam: float) -> np.ndarray:
+def shrink_select(comps: list, S: np.ndarray, cfg, lam: float, groups: list | None = None) -> np.ndarray:
     """Soft version of segment_select: debiased-MSE weights with the bias of
     every component measured against the reference r = segment_select's
     (newest anchor-consistent segment + anchor) instead of the noisy anchor.
@@ -346,7 +348,7 @@ def shrink_select(comps: list, S: np.ndarray, cfg, lam: float) -> np.ndarray:
         ref = np.zeros(len(comps))
         ref[idx] = select_weights(S[np.ix_(idx, idx)], np.zeros(len(idx)), 0.0)
     else:
-        ref = segment_select(comps, S, cfg.z_group, cfg.z_anchor, cfg.fallback, cfg.grouping)
+        ref = segment_select(comps, S, cfg.z_group, cfg.z_anchor, cfg.fallback, cfg.grouping, groups)
     values = np.array([c.value for c in comps])
     d = values - ref @ values
     P = np.eye(len(comps)) - np.outer(np.ones(len(comps)), ref)
@@ -421,7 +423,7 @@ def build_components(history: list, anchor: LoggedData, X_target: np.ndarray, pi
 
 
 def combine(comps: list, anchor_comp, cfg: ODriftConfig, lam: float | None = None,
-            bound_comps: tuple | None = None) -> ODriftResult:
+            bound_comps: tuple | None = None, window_groups: list | None = None) -> ODriftResult:
     """Select weights and form the transfer-robust interval.
 
     `bound_comps` = (comps, anchor_comp) from an independent split, used for
@@ -446,10 +448,15 @@ def combine(comps: list, anchor_comp, cfg: ODriftConfig, lam: float | None = Non
     S_sel = covariance(sel)
     z_k = norm.ppf(1 - cfg.delta_bias / (2 * len(keep))) if keep else 0.0
     B = bias_bounds(sel, sel_anchor, S_sel, z_k)
+    groups = None
+    if window_groups is not None:
+        # map window indices (from the reward monitor) to positions among eligible components
+        pos = {sel_comps[i].index: j for j, i in enumerate(keep)}
+        groups = [g for g in ([pos[k] for k in grp if k in pos] for grp in window_groups) if g]
     if cfg.selection == "segment":
-        alpha = segment_select(sel, S_sel, cfg.z_group, cfg.z_anchor, cfg.fallback, cfg.grouping)
+        alpha = segment_select(sel, S_sel, cfg.z_group, cfg.z_anchor, cfg.fallback, cfg.grouping, groups)
     elif cfg.selection == "shrink":
-        alpha = shrink_select(sel, S_sel, cfg, lam)
+        alpha = shrink_select(sel, S_sel, cfg, lam, groups)
     elif cfg.selection == "mse":
         d_sel, C_sel = diff_moments(sel, S_sel)
         alpha = select_weights(S_sel, B, lam, Q=mse_objective(S_sel, d_sel, C_sel, lam))
