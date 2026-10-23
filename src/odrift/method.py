@@ -330,7 +330,17 @@ def shrink_select(comps: list, S: np.ndarray, cfg, lam: float) -> np.ndarray:
     discrepancy is small relative to its noise keep partial weight instead
     of an all-or-nothing split.
     """
-    if cfg.shrink_ref > 0:
+    if cfg.shrink_ess > 0:
+        # reference by evidence, not calendar: newest windows until cumulative ESS >= target
+        idx, total = [len(comps) - 1], 0.0
+        for k in range(len(comps) - 2, -1, -1):
+            if total >= cfg.shrink_ess:
+                break
+            idx.append(k)
+            total += comps[k].diagnostics.ess
+        ref = np.zeros(len(comps))
+        ref[idx] = select_weights(S[np.ix_(idx, idx)], np.zeros(len(idx)), 0.0)
+    elif cfg.shrink_ref > 0:
         # reference: the most recent `shrink_ref` eligible windows + anchor
         idx = list(range(max(0, len(comps) - 1 - cfg.shrink_ref), len(comps)))
         ref = np.zeros(len(comps))
@@ -355,6 +365,7 @@ class ODriftConfig:
     fallback: str = "anchor"     # all groups vetoed -> "anchor" alone | "least" contradicted group + anchor
     grouping: str = "greedy"     # "greedy" window-vs-group | "changepoint" binary segmentation
     shrink_ref: int = 0          # "shrink": 0 = segment reference; m > 0 = newest m windows + anchor
+    shrink_ess: float = 0.0      # "shrink": > 0 = newest windows until cumulative ESS >= this (overrides m)
     anchor_sn: bool = False      # self-normalized DR for the anchor component
     delta_variance: float = 0.025
     delta_bias: float = 0.025

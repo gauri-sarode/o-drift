@@ -36,7 +36,7 @@ def name(zg, za, fb, sn):
 
 
 def run_one(args):
-    regime_name, intensity, env_seed, data_seed, truths, z_groups, z_anchors, fallbacks, sns, groupings, shrink_refs = args
+    regime_name, intensity, env_seed, data_seed, truths, z_groups, z_anchors, fallbacks, sns, groupings, shrink_refs, shrink_ess = args
     env = EnvParams.sample(env_seed, d=SIM["d"], n_actions=SIM["n_actions"], misspec=SIM["misspec"])
     regime = REGIMES[regime_name](intensity, K=SIM["n_windows"])
     pis = [Policy.near_optimal(env, noise=s, seed=env_seed) for s in TUNE["candidate_policies"]]
@@ -58,6 +58,11 @@ def run_one(args):
                                                     selection="shrink", shrink_ref=m), 1.0)
                     out.setdefault(f"shrink{m}:{gr[:2]}:" + name(zg, za, fb, sn), []).append(
                         dict(err=r.value - truths[p_idx], hw=r.half_width, anchor_only=False))
+                for t in shrink_ess:
+                    r = combine(comps, anc, replace(cfg, grouping=gr, z_group=zg, z_anchor=za, fallback=fb,
+                                                    selection="shrink", shrink_ess=t), 1.0)
+                    out.setdefault(f"shrinkESS{int(t)}:{gr[:2]}:" + name(zg, za, fb, sn), []).append(
+                        dict(err=r.value - truths[p_idx], hw=r.half_width, anchor_only=False))
     return out
 
 
@@ -70,6 +75,7 @@ def main():
     ap.add_argument("--sn", type=int, nargs="*", default=None)
     ap.add_argument("--grouping", nargs="*", default=["greedy"])
     ap.add_argument("--shrink-ref", type=int, nargs="*", default=[])
+    ap.add_argument("--shrink-ess", type=float, nargs="*", default=[])
     ap.add_argument("--out", default="results/05_compare_fixes.json")
     args = ap.parse_args()
     global Z_ANCHOR, FALLBACKS, SN
@@ -84,7 +90,7 @@ def main():
     with ProcessPoolExecutor() as pool:
         for key, cell in dev["cells"].items():
             regime_name, intensity = key.split("@")[0], float(key.split("@")[1])
-            jobs = [(regime_name, intensity, e, start + s, cell["truths"][str(e)], z_groups, Z_ANCHOR, FALLBACKS, SN, args.grouping, args.shrink_ref)
+            jobs = [(regime_name, intensity, e, start + s, cell["truths"][str(e)], z_groups, Z_ANCHOR, FALLBACKS, SN, args.grouping, args.shrink_ref, args.shrink_ess)
                     for e in DEV["env_seeds"] for s in range(args.reps)]
             res = list(pool.map(run_one, jobs))
             summary[key] = {}
