@@ -112,3 +112,16 @@ def test_combine_with_monitor_groups_drops_reward_shifted_windows():
     comps, anc = build_components(ep.history, ep.anchor, ep.target_contexts, PI, ENV.n_actions, ODriftConfig())
     r = combine(comps, anc, ODriftConfig(fallback="least"), window_groups=[list(range(6, 12)), list(range(6))])
     assert sum(r.weights.get(k, 0) for k in range(6)) < 1e-6
+
+
+def test_segment_reward_models_unbiased_in_stationary_history():
+    from odrift.method import ODriftConfig, build_components, combine, fit_all_nuisances
+    regime = REGIMES["S0"](0.0)
+    ep = sample_episode(ENV, regime, 4000, 1000, 10000, seed=3)
+    cfg = ODriftConfig(fallback="least")
+    nuis = fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, ENV.n_actions, cfg,
+                             segments=[list(range(regime.n_windows))])
+    comps, anc = build_components(ep.history, ep.anchor, ep.target_contexts, PI, ENV.n_actions, cfg, nuisances=nuis)
+    r = combine(comps, anc, cfg)
+    truth = true_value(ENV, PI, regime.target, regime.target)
+    assert abs(r.value - truth) < 4 * r.se

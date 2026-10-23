@@ -416,10 +416,27 @@ class ODriftResult:
 
 
 def fit_all_nuisances(history: list, anchor: LoggedData, X_target: np.ndarray, n_actions: int,
-                      cfg: ODriftConfig, seed: int = 0) -> tuple:
-    """Policy-independent nuisances for every window and the anchor (or None)."""
-    hist = [fit_nuisances(d, X_target, n_actions, seed=seed + k, context_alpha=cfg.context_alpha)
-            for k, d in enumerate(history)]
+                      cfg: ODriftConfig, seed: int = 0, segments: list | None = None) -> tuple:
+    """Policy-independent nuisances for every window and the anchor (or None).
+
+    segments: reward-homogeneous window groups (e.g. from the reward monitor).
+    When given, one cross-fitted reward model is fit per segment on the pooled
+    segment data and shared by its windows -- valid because the windows share
+    q -- instead of one model per window. Context ratios stay per window.
+    """
+    if segments is None:
+        hist = [fit_nuisances(d, X_target, n_actions, seed=seed + k, context_alpha=cfg.context_alpha)
+                for k, d in enumerate(history)]
+    else:
+        hist = [None] * len(history)
+        for j, seg in enumerate(segments):
+            pooled = LoggedData.concat([history[k] for k in seg])
+            q_src, q_tgt = crossfit_rewards(pooled, n_actions, seed=seed + 100 * j, extra_X=X_target)
+            for k in seg:
+                d, m = history[k], pooled.window == k
+                shift = cfg.context_alpha <= 0 or context_shift_pvalue(d.X, X_target) < cfg.context_alpha
+                w = context_ratio(d.X, X_target, seed=seed + k) if shift else np.ones(len(d))
+                hist[k] = Nuisances(q_src[m], q_tgt, w)
     anc = (fit_nuisances(anchor, X_target, n_actions, same_distribution=True, seed=seed + 999)
            if len(anchor) >= cfg.min_anchor else None)
     return hist, anc
