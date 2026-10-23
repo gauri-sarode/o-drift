@@ -23,7 +23,7 @@ import yaml
 
 from odrift import baselines as bl
 from odrift.method import (ODriftConfig, build_components, combine, covariance, fit_all_nuisances,
-                           make_corrected_split, odrift_balanced, odrift_corrected, odrift_corrected_split,
+                           make_corrected_split, odrift_balanced, ratio_function, odrift_corrected, odrift_corrected_split,
                            select_weights)
 from odrift.monitor import ResidualStats, reward_changepoints
 from odrift.nuisance import RewardModel, crossfit_rewards
@@ -63,11 +63,15 @@ def method_grid(split, tuned):
         "recent": TUNE["baseline_grids"]["recent_windows"],
         "decay": TUNE["baseline_grids"]["decay_gamma"],
         "liu": TUNE["baseline_grids"]["liu_recent_windows"],
-        "odrift": [(m, a) for m in TUNE["odrift_grid"]["monitor_alpha"] for a in TUNE["odrift_grid"]["z_anchor"]],
+        "odrift": [(m, a, int(j)) for m in TUNE["odrift_grid"]["monitor_alpha"] for a in TUNE["odrift_grid"]["z_anchor"]
+                   for j in TUNE["odrift_grid"]["joint_segments"]],
         "slope": TUNE["baseline_grids"]["slope_kappa"],
         "magic": TUNE["baseline_grids"]["magic_z_ref"],
         "trecent": TUNE["baseline_grids"]["transport_recent"],
         "tdecay": TUNE["baseline_grids"]["transport_decay"],
+        "forecast": TUNE["baseline_grids"]["forecast_degree"],
+        "timedr": TUNE["baseline_grids"]["time_dr_degree"],
+        "tbdecay": TUNE["baseline_grids"]["transport_balanced_decay"],
     }
     if split == "test":
         full = {k: grid[k] for k in ("recent", "decay")}  # for oracle-tuned upper bounds only
@@ -87,12 +91,14 @@ def run_one(args):
 
     # ---- policy-independent fits, shared by all candidate policies
     stats = ResidualStats(ep.history, A)
-    monitor_alphas = sorted({m for m, _ in grid["odrift"]})
+    monitor_alphas = sorted({m for m, _, _ in grid["odrift"]})
+    joints = sorted({j for _, _, j in grid["odrift"]})
     segments = {m: reward_changepoints(stats, m) for m in monitor_alphas}
     # per-window, always-transport nuisances for baselines/oracle/selector ablations
     nuis = fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, A, replace(CFG, context_alpha=0.0), data_seed)
-    seg_nuis = {m: fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, A, CFG, data_seed,
-                                     segments=segments[m]) for m in monitor_alphas}
+    seg_nuis = {(m, j): fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, A,
+                                          replace(CFG, joint_segments=bool(j)), data_seed, segments=segments[m])
+                for m in monitor_alphas for j in joints}
     datasets = {"pooled": LoggedData.concat(ep.history + ([ep.anchor] if n_anchor else []))}
     if has_anchor:
         datasets["anchor"] = ep.anchor
@@ -117,6 +123,14 @@ def run_one(args):
             if counts[k]:
                 art = spec if spec.recorded_logger_id is None else replace(spec, logger_id=spec.recorded_logger_id)
                 mixture += counts[k] / counts.sum() * mu(env, art, pooled_d.X)
+    if has_anchor:
+        # drift-specific baselines: time-aware reward models; composite transport+balanced+decay
+        time_q = {deg: bl.fit_time_reward(pooled_d, K, ep.target_contexts, A, deg, data_seed) for deg in grid["timedr"]}
+        q_pool_own, q_pool_tgt = crossfit_rewards(pooled_d, A, seed=data_seed, extra_X=ep.target_contexts)
+        ratio_fns = [ratio_function(d.X, ep.target_contexts) for d in ep.history] + [None]
+        tgt_art = regime.target if regime.target.recorded_logger_id is None else \
+            replace(regime.target, logger_id=regime.target.recorded_logger_id)
+        logger_fns_all = logger_fns + [lambda X, a=tgt_art: mu(env, a, X)]
     liu_models = {B: RewardModel(A).fit(LoggedData.concat(ep.history[K - B:])) for B in grid["liu"]} if has_anchor else {}
 
     rec = {}  # method -> list over policies of (estimate, half_width, extra)
@@ -134,9 +148,9 @@ def run_one(args):
         e = dr_on("pooled")
         put("pooled_dr", e.value, Z95 * e.se)
         if not has_anchor:
-            m, za = grid["odrift"][0]
+            m, za, j = grid["odrift"][0]
             r = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, pi, A, replace(CFG, z_anchor=za),
-                                seg_nuis[m], segments[m], logger_fns)
+                                seg_nuis[(m, j)], segments[m], logger_fns)
             put("odrift", r.value, r.half_width, status=r.status)
             continue
         e = dr_on("anchor")
@@ -191,15 +205,26 @@ def run_one(args):
             a_ = np.array([g ** (K - c.index) for c in sub]) / np.diag(Ssub)
             a_ /= a_.sum()
             put(f"tdecay[{g}]", float(a_ @ [c.value for c in sub]), Z95 * float(np.sqrt(a_ @ Ssub @ a_)))
-        for m, za in grid["odrift"]:
+        for deg in grid["forecast"]:
+            sub = elig + [anc]
+            v_, se_ = bl.forecast_value(sub, covariance(sub), K, deg)
+            put(f"forecast[{deg}]", v_, Z95 * se_)
+        for deg in grid["timedr"]:
+            e = bl.time_aware_dr(pooled, *time_q[deg], ep.target_contexts, pi)
+            put(f"timedr[{deg}]", e.value, Z95 * e.se)
+        for g in grid["tbdecay"]:
+            e = bl.transport_balanced_decay_dr(pooled, q_pool_own, q_pool_tgt, ep.target_contexts, pi, K, g,
+                                               logger_fns_all, ratio_fns)
+            put(f"tbdecay[{g}]", e.value, Z95 * e.se)
+        for m, za, j in grid["odrift"]:
             r = odrift_corrected(ep.history, ep.anchor, ep.target_contexts, pi, A, replace(CFG, z_anchor=za),
-                                 seg_nuis[m], segments[m])
-            put(f"ablate_nobalance[{m},{za}]", r.value, Z95 * (r.se_hetero or r.se))
+                                 seg_nuis[(m, j)], segments[m])
+            put(f"ablate_nobalance[{m},{za},{j}]", r.value, Z95 * (r.se_hetero or r.se))
             r = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, pi, A, replace(CFG, z_anchor=za),
-                                seg_nuis[m], segments[m], logger_fns)
+                                seg_nuis[(m, j)], segments[m], logger_fns)
             deficient = [k for k, reasons in r.reasons.items() if "target_support" in reasons]
             hw_re = Z95 * (r.se_hetero if r.se_hetero is not None else r.se)
-            put(f"odrift[{m},{za}]", r.value, hw_re, hw_narrow=float(Z95 * r.se), hw_certified_bound=float(r.half_width),
+            put(f"odrift[{m},{za},{j}]", r.value, hw_re, hw_narrow=float(Z95 * r.se), hw_certified_bound=float(r.half_width),
                 status=r.status, weights=[r.weights.get(k, 0.0) for k in range(K + 1)],
                 deficient=deficient, ineligible=sorted(r.reasons), n_segments=len(segments[m]))
         # oracle selector: true transfer biases, same components
@@ -212,13 +237,14 @@ def run_one(args):
 
     # sample-split O-DRIFT (Proposition 2 conditions), interval only, per policy
     if has_anchor:
-        splits = {m: make_corrected_split(ep.history, ep.anchor, ep.target_contexts, A, CFG, m, data_seed)
-                  for m in monitor_alphas}
+        splits = {(m, j): make_corrected_split(ep.history, ep.anchor, ep.target_contexts, A,
+                                               replace(CFG, joint_segments=bool(j)), m, data_seed)
+                  for m in monitor_alphas for j in joints}
         for p_idx, pi in enumerate(pis):
             v_t = truths[p_idx][0]
-            for m, za in grid["odrift"]:
-                r = odrift_corrected_split(splits[m], pi, A, replace(CFG, z_anchor=za))
-                rec.setdefault(f"odrift_split[{m},{za}]", []).append(
+            for m, za, j in grid["odrift"]:
+                r = odrift_corrected_split(splits[(m, j)], pi, A, replace(CFG, z_anchor=za))
+                rec.setdefault(f"odrift_split[{m},{za},{j}]", []).append(
                     dict(est=r.value, err=r.value - v_t, hw=r.half_width))
     return rec
 

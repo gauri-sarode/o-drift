@@ -16,9 +16,10 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-FAMILY = re.compile(r"^(recent_dr|decay_dr|liu_reg|odrift_split|odrift|slope|magic|trecent|tdecay)\[(.+)\]$")
+FAMILY = re.compile(r"^(recent_dr|decay_dr|liu_reg|odrift_split|odrift|slope|magic|trecent|tdecay|forecast|timedr|tbdecay)\[(.+)\]$")
 FAMILY_KEY = {"recent_dr": "recent", "decay_dr": "decay", "liu_reg": "liu", "odrift": "odrift",
-              "slope": "slope", "magic": "magic", "trecent": "trecent", "tdecay": "tdecay"}
+              "slope": "slope", "magic": "magic", "trecent": "trecent", "tdecay": "tdecay",
+              "forecast": "forecast", "timedr": "timedr", "tbdecay": "tbdecay"}
 BASELINES = ["pooled_dr", "anchor_dr", "recent_dr", "decay_dr", "minvar_dr", "liu_reg", "transport_dr"]
 
 
@@ -69,8 +70,8 @@ def tune(data):
         means = {s: float(np.mean(v)) for s, v in settings.items()}
         best = min(means, key=means.get)
         report[fam] = dict(sorted(means.items(), key=lambda kv: kv[1]))
-        parsed = [float(x) for x in best.split(",")]
-        int_families = {"recent", "liu", "trecent"}  # window counts; everything else stays float
+        parsed = [int(x) if x.lstrip("-").isdigit() else float(x) for x in best.split(",")]
+        int_families = {"recent", "liu", "trecent", "forecast", "timedr"}  # window counts; everything else stays float
         tuned[fam] = parsed if len(parsed) > 1 else (int(parsed[0]) if fam in int_families else parsed[0])
     return tuned, report
 
@@ -127,7 +128,8 @@ def main():
     od, ods = name("odrift", "odrift"), name("odrift", "odrift_split")
     tuned_baselines = ["pooled_dr", "anchor_dr", name("recent", "recent_dr"), name("decay", "decay_dr"),
                        "minvar_dr", name("liu", "liu_reg"), "transport_dr"]
-    for fam, prefix in (("slope", "slope"), ("magic", "magic"), ("trecent", "trecent"), ("tdecay", "tdecay")):
+    for fam, prefix in (("slope", "slope"), ("magic", "magic"), ("trecent", "trecent"), ("tdecay", "tdecay"),
+                        ("forecast", "forecast"), ("timedr", "timedr"), ("tbdecay", "tbdecay")):
         if fam in tuned:
             tuned_baselines.append(name(fam, prefix))
     tuned_baselines += ["anchor_validated", "balanced_dr", "monitor_select_dr"]
@@ -163,6 +165,22 @@ def main():
               f"ratio={ratio:.2f}  cov(hetero)={summary[key]['coverage_hetero']:.3f}"
               f"[hw {summary[key]['halfwidth_hetero'] * 1e3:.1f}]  cov(narrow)={summary[key]['coverage_plugin_narrow']:.3f}"
               f"  cov(certified Liu)={summary[key]['coverage_certified_liu']:.3f}[hw {summary[key]['halfwidth_certified_liu'] * 1e3:.1f}]")
+
+    # pre-registered breakdowns (protocol endpoints.breakdowns)
+    print("\nBreakdown: ratio to best tuned baseline per env seed | per candidate policy ; O-DRIFT bias/sd x1e3")
+    for key, cell in data["cells"].items():
+        if key not in summary:
+            continue
+        base = summary[key]["best_baseline"]
+        eo = np.array([[p["err"] for p in r[od]] for r in cell["reps"]])
+        eb = np.array([[p["err"] for p in r[base]] for r in cell["reps"]])
+        env = np.array(cell["env_of_rep"]).astype(str)
+        by_env = [np.sqrt((eo[env == e] ** 2).mean() / (eb[env == e] ** 2).mean()) for e in sorted(set(env))]
+        by_pol = np.sqrt((eo ** 2).mean(0) / (eb ** 2).mean(0))
+        summary[key].update(ratio_by_env=[float(x) for x in by_env], ratio_by_policy=by_pol.tolist(),
+                            bias=float(eo.mean()), sd=float(eo.std()))
+        print(f"  {key:10s} env " + " ".join(f"{x:.2f}" for x in by_env) + " | pol " + " ".join(f"{x:.2f}" for x in by_pol)
+              + f" ; bias {eo.mean() * 1e3:+.1f} sd {eo.std() * 1e3:.1f}")
 
     if args.split == "test":
         go = []

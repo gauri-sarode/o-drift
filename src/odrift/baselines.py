@@ -151,3 +151,92 @@ def balanced_mixture_dr(data: LoggedData, mixture_probs: np.ndarray, pi_probs: n
     rho = pi_probs[idx, data.A] / mixture_probs[idx, data.A]
     scores = (pi_probs * q_hat).sum(axis=1) + rho * (data.R - q_hat[idx, data.A])
     return _weighted_estimate(scores, np.ones(len(data)))
+
+
+# ------------------------------------------------- drift-specific baselines (added before freeze)
+
+def forecast_value(comps: list, S: np.ndarray, K: int, degree: int) -> tuple:
+    """Time-series forecast of per-window value estimates (Chandak et al., NeurIPS 2020,
+    "Optimizing for the future in non-stationary MDPs"; here with windows as time steps).
+
+    Per-window estimates V_k (index k = 0..K-1; the anchor is index K, the target period)
+    are regressed on a polynomial in t = k/K by generalized least squares with their joint
+    covariance S, and the fit is evaluated at t = 1. Returns (value, se).
+    """
+    t = np.array([c.index for c in comps], dtype=float) / K
+    Phi = np.vander(t, degree + 1, increasing=True)
+    L = np.linalg.cholesky(S + 1e-12 * np.trace(S) / len(S) * np.eye(len(S)))
+    Pw, yw = np.linalg.solve(L, Phi), np.linalg.solve(L, np.array([c.value for c in comps]))
+    cov = np.linalg.pinv(Pw.T @ Pw)
+    beta = cov @ Pw.T @ yw
+    phi_t = np.ones(degree + 1)
+    return float(phi_t @ beta), float(np.sqrt(max(phi_t @ cov @ phi_t, 0.0)))
+
+
+def _time_features(X: np.ndarray, A: np.ndarray, t: np.ndarray, n_actions: int, degree: int) -> np.ndarray:
+    """[onehot(a), x*onehot(a)] interacted with (1, t, ..., t^degree)."""
+    onehot = np.eye(n_actions)[A]
+    base = np.hstack([onehot, (X[:, :, None] * onehot[:, None, :]).reshape(len(A), -1)])
+    return np.hstack([base * (t ** p)[:, None] for p in range(degree + 1)])
+
+
+def fit_time_reward(data: LoggedData, K: int, X_target: np.ndarray, n_actions: int, degree: int,
+                    seed: int = 0) -> tuple:
+    """Cross-fitted time-aware reward model q(x, a, t), t = window/K (policy-independent).
+
+    Returns (out-of-fold q at each record's own (x, a, t), fold-averaged q(x*, ., 1) on
+    the target contexts, shape (M, A))."""
+    from sklearn.linear_model import LogisticRegression
+    t = data.window / K
+    folds = np.random.default_rng(seed).permutation(len(data)) % 2
+    M = len(X_target)
+    q_own, q_tgt = np.empty(len(data)), np.zeros((M, n_actions))
+    F_tgt = _time_features(np.tile(X_target, (n_actions, 1)), np.repeat(np.arange(n_actions), M),
+                           np.ones(n_actions * M), n_actions, degree)
+    for f in range(2):
+        tr = folds != f
+        model = LogisticRegression(C=1.0, max_iter=2000, fit_intercept=False)
+        model.fit(_time_features(data.X[tr], data.A[tr], t[tr], n_actions, degree), data.R[tr])
+        q_own[~tr] = model.predict_proba(_time_features(data.X[~tr], data.A[~tr], t[~tr], n_actions, degree))[:, 1]
+        q_tgt += model.predict_proba(F_tgt)[:, 1].reshape(n_actions, M).T / 2
+    return q_own, q_tgt
+
+
+def time_aware_dr(data: LoggedData, q_own: np.ndarray, q_tgt: np.ndarray, X_target: np.ndarray, pi) -> Estimate:
+    """Pooled DR with a time-aware reward model: DM term at the target time (t = 1) on
+    target contexts + every record's residual against the model at its own time."""
+    rho = importance_weights(data, pi.probs(data.X))
+    dm = (pi.probs(X_target) * q_tgt).sum(axis=1)
+    corr = rho * (data.R - q_own)
+    v = float(dm.mean() + corr.mean())
+    return Estimate(v, float(np.sqrt(dm.var(ddof=1) / len(dm) + corr.var(ddof=1) / len(corr))), len(data))
+
+
+def transport_balanced_decay_dr(data: LoggedData, q_own: np.ndarray, q_tgt: np.ndarray, X_target: np.ndarray,
+                                pi, K: int, gamma: float, logger_fns: list, ratio_fns: list) -> Estimate:
+    """Composite baseline: context transport + multi-logger balancing + exponential decay,
+    with one pooled reward model and no drift detection or correction.
+
+    Record weights h_i = gamma^(K - k_i); importance weight from the target to the
+    h-weighted sampling mixture sum_k c_k p_k(x) mu_k(a|x), c_k ∝ h_k n_k, with
+    p_k = p_T / w_k:  W_i = pi(a_i|x_i) / sum_k c_k mu_k(a_i|x_i) / w_k(x_i).
+    logger_fns / ratio_fns have K + 1 entries (index K = anchor; ratio_fns[k] None = 1).
+    gamma = 1 is transport + balanced pooling of everything.
+    """
+    N, idx = len(data), np.arange(len(data))
+    counts = np.bincount(data.window, minlength=K + 1).astype(float)
+    c = counts * gamma ** (K - np.arange(K + 1))
+    c /= c.sum()
+    denom = np.zeros(N)
+    for k in range(K + 1):
+        if counts[k]:
+            w_k = ratio_fns[k](data.X) if ratio_fns[k] is not None else 1.0
+            denom += c[k] * logger_fns[k](data.X)[idx, data.A] / w_k
+    W = pi.probs(data.X)[idx, data.A] / denom
+    h = gamma ** (K - data.window)
+    corr = W * (data.R - q_own[idx, data.A])
+    dm = (pi.probs(X_target) * q_tgt).sum(axis=1)
+    hn = h / h.sum()
+    v = float(dm.mean() + hn @ corr)
+    se = float(np.sqrt(dm.var(ddof=1) / len(dm) + ((hn * (corr - hn @ corr)) ** 2).sum()))
+    return Estimate(v, se, N)

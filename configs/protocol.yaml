@@ -41,6 +41,8 @@ splits:
       S5: [0.5, 1.0]                          # drift type never seen in dev
       S6: [0.0]
       S7: [0.0]
+      S8: [0.5, 1.0]                          # misspecified (out-of-class) reward drift; added 2026-10-23
+                                              # before freeze; dev S8 runs are diagnostic only, never tuned on
   real:
     dataset: open_bandit  # semi-synthetic temporal interventions only; never claimed as natural drift
 
@@ -57,6 +59,10 @@ tuning:  # dev split only
     magic_z_ref: [0.67, 1.0, 1.96]          # MAGIC (Thomas & Brunskill 2016) reference-CI z
     transport_recent: [1, 2, 3, 4, 6, 8, 12]  # transport DR on newest k windows + anchor
     transport_decay: [0.5, 0.7, 0.8, 0.9, 0.95]  # transport DR, weights ~ gamma^(K-k)/var_k
+    # Drift-specific baselines (added 2026-10-23, before any run of these baselines):
+    forecast_degree: [1, 2, 3]              # Chandak et al. 2020: GLS polynomial forecast of per-window values
+    time_dr_degree: [1, 2]                  # pooled DR, reward model with polynomial time interactions
+    transport_balanced_decay: [0.7, 0.8, 0.9, 0.95, 1.0]  # composite transport + balanced + decay
     # untuned: anchor-validated selection, multi-logger balanced DR, monitor-informed selection.
     # recent/decay full grids are also run on test, ONLY to report per-cell oracle-tuned
     # upper bounds (labelled as such); comparisons use the dev-tuned settings.
@@ -71,12 +77,18 @@ tuning:  # dev split only
   odrift_grid:                              # tuned on dev with the family-wise rule above
     monitor_alpha: [0.01, 0.001, 0.0001]
     z_anchor: [3.0, 3.5, 4.0, 5.0]
+    joint_segments: [false, true]           # added 2026-10-23 (decision log 16): segment reward models fit
+                                            # separately vs jointly (shared base + per-segment offsets)
   delta_split: {variance: 0.025, bias: 0.025}  # union-bound allocation for 95% intervals
 
 endpoints:
   primary: [rmse, policy_selection_regret]
   secondary: [coverage_95, coverage_90, mean_interval_width, abstention_rate, selective_coverage]
   stats: paired bootstrap over replications (10k resamples), 95% CI on RMSE differences
+  # pre-registered 2026-10-23 (before any test run):
+  breakdowns: per-env-seed and per-candidate-policy RMSE ratio vs best tuned baseline, bias/sd split,
+    reported for every cell (no cell-level cherry-picking); S8 reported as robustness, not a go/no-go cell
+  fairness: report the number of dev settings searched per method family (O-DRIFT 12; baselines 3-7)
 
 go_no_go:
   go_if_all:

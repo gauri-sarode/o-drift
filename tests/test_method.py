@@ -170,3 +170,19 @@ def test_balanced_segment_pooling_unbiased_under_logger_switch():
         r = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, PI, ENV.n_actions, cfg, nuis, segs, fns)
         errs.append(r.value - truth); ses.append(r.se)
     assert abs(np.mean(errs)) < 2 * np.mean(ses)
+
+
+def test_balanced_weights_reported_per_window_and_exclude_deficient():
+    from odrift.method import ODriftConfig, fit_all_nuisances, odrift_balanced
+    from odrift.simulator import mu
+    regime = REGIMES["S7"](0.0)
+    fns = [lambda X, sp=sp: mu(ENV, sp, X) for sp in regime.windows]
+    cfg = ODriftConfig(z_anchor=5.0, fallback="least", context_alpha=0.01)
+    ep = sample_episode(ENV, regime, 3000, 1000, 4000, seed=0)
+    segs = [list(range(regime.n_windows))]
+    nuis = fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, ENV.n_actions, cfg, segments=segs)
+    r = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, PI, ENV.n_actions, cfg, nuis, segs, fns)
+    assert abs(sum(r.weights.values()) - 1) < 1e-6 and set(r.weights) == set(range(regime.n_windows + 1))
+    deficient = [k for k, why in r.reasons.items() if "target_support" in why]
+    assert deficient and sum(r.weights[k] for k in deficient) == 0
+    assert sum(r.weights[k] for k in range(regime.n_windows) if k not in deficient) > 0.5

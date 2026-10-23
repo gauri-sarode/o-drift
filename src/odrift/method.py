@@ -126,6 +126,7 @@ class Component:
     dm_scores: np.ndarray     # m_hat_k(X*_j), length M (shared target contexts)
     corr_scores: np.ndarray   # w rho (R - q_hat), length n_k
     diagnostics: Diagnostics
+    members: dict = field(default_factory=dict)  # pooled components: window -> share of records
 
     @property
     def var(self) -> float:
@@ -401,6 +402,7 @@ class ODriftConfig:
     shrink_ess: float = 0.0      # "shrink": > 0 = newest windows until cumulative ESS >= this (overrides m)
     context_alpha: float = 0.0   # > 0: density-ratio transport only for windows whose context-shift test rejects
     balanced: bool = False       # pool each reward segment with balanced (mixture) propensities
+    joint_segments: bool = False  # segment reward models: one joint fit (shared base + per-segment offsets)
     anchor_sn: bool = False      # self-normalized DR for the anchor component
     delta_variance: float = 0.025
     delta_bias: float = 0.025
@@ -439,7 +441,9 @@ def fit_all_nuisances(history: list, anchor: LoggedData, X_target: np.ndarray, n
     segment data and shared by its windows -- valid because the windows share
     q -- instead of one model per window. Context ratios stay per window.
     """
-    if segments is None:
+    if segments is not None and cfg.joint_segments:
+        hist = _joint_segment_nuisances(history, X_target, n_actions, cfg, seed, segments)
+    elif segments is None:
         hist = [fit_nuisances(d, X_target, n_actions, seed=seed + k, context_alpha=cfg.context_alpha)
                 for k, d in enumerate(history)]
     else:
@@ -455,6 +459,46 @@ def fit_all_nuisances(history: list, anchor: LoggedData, X_target: np.ndarray, n
     anc = (fit_nuisances(anchor, X_target, n_actions, same_distribution=True, seed=seed + 999)
            if len(anchor) >= cfg.min_anchor else None)
     return hist, anc
+
+
+def _joint_segment_nuisances(history: list, X_target: np.ndarray, n_actions: int, cfg: ODriftConfig,
+                             seed: int, segments: list) -> list:
+    """One cross-fitted logistic model on all history: shared per-action linear base plus
+    a per-segment linear offset (segments[0], the newest, is the baseline). Segment models
+    then share the base's misspecification error, so the drift estimate q_ref - q_old used
+    by drift-corrected reuse is the offset alone rather than a difference of two separately
+    misspecified fits on different context distributions."""
+    from sklearn.linear_model import LogisticRegression
+    from .nuisance import _features
+    seg_of = {k: j for j, seg in enumerate(segments) for k in seg}
+    pooled = LoggedData.concat(history)
+    sid = np.array([seg_of[k] for k in pooled.window])
+    J, M = len(segments), len(X_target)
+
+    def feats(X, A, s_ids):
+        base = _features(X, A, n_actions)
+        return np.hstack([base] + [base * (s_ids == j)[:, None] for j in range(1, J)])
+
+    folds = np.random.default_rng(seed).permutation(len(pooled)) % 2
+    q_src = np.empty((len(pooled), n_actions))
+    q_tgt = np.zeros((J, M, n_actions))
+    Xr, Ar = np.tile(X_target, (n_actions, 1)), np.repeat(np.arange(n_actions), M)
+    for f in range(2):
+        tr = folds != f
+        model = LogisticRegression(C=1.0, max_iter=3000, fit_intercept=False)
+        model.fit(feats(pooled.X[tr], pooled.A[tr], sid[tr]), pooled.R[tr])
+        te = np.where(~tr)[0]
+        for a in range(n_actions):
+            q_src[te, a] = model.predict_proba(feats(pooled.X[te], np.full(len(te), a), sid[te]))[:, 1]
+        for j in range(J):
+            q_tgt[j] += model.predict_proba(feats(Xr, Ar, np.full(len(Ar), j)))[:, 1].reshape(n_actions, M).T / 2
+    hist = []
+    for k, d in enumerate(history):
+        shift = cfg.context_alpha <= 0 or context_shift_pvalue(d.X, X_target) < cfg.context_alpha
+        w = context_ratio(d.X, X_target, seed=seed + k) if shift else np.ones(len(d))
+        hist.append(Nuisances(q_src[pooled.window == k], q_tgt[seg_of[k]], w,
+                              ratio_function(d.X, X_target) if shift else None))
+    return hist
 
 
 def build_components(history: list, anchor: LoggedData, X_target: np.ndarray, pi, n_actions: int,
@@ -741,7 +785,8 @@ def balanced_segment_components(history: list, anchor: LoggedData, X_target: np.
         diag = diagnose(data, p_src, n_actions, np.ones(N), z_diag, cfg.min_ess)
         diag.reasons = [r for r in diag.reasons if r != "propensity_inconsistent"]  # mixture data: checked per window
         diag.ess = effective_sample_size(W)
-        comps.append(Component(1000 + j, float(dm.mean() + corr.mean()), dm, corr, diag))
+        comps.append(Component(1000 + j, float(dm.mean() + corr.mean()), dm, corr, diag,
+                               members={k: len(history[k]) / N for k in ks}))
     anc = None
     if anc_nuis is not None:
         anc = next(c for c in [transported_dr(anchor, X_target, pi, n_actions, len(history), z_diag, cfg.min_ess,
@@ -762,5 +807,12 @@ def odrift_balanced(history: list, anchor: LoggedData, X_target: np.ndarray, pi,
         return combine(comps, anc, cfg, window_groups=segments)
     res = combine(seg_comps, anc_c, replace(cfg, **POOL))
     res.se_hetero = heterogeneity_se(res, seg_comps, anc_c)
+    # report weights per window (segment weight split by record share) + anchor (index K)
+    window_w = {k: 0.0 for k in range(len(history) + 1)}
+    for c in seg_comps:
+        for k, share in c.members.items():
+            window_w[k] += res.weights.get(c.index, 0.0) * share
+    window_w[len(history)] = res.weights.get(len(history), 0.0)
+    res.weights = window_w
     res.reasons.update({c.index: c.diagnostics.reasons for c in comps if not c.diagnostics.eligible})
     return res

@@ -7,6 +7,7 @@ and conditional reward q_k(X, A), and the three can be shifted independently:
     X ~ N(c_k * u, I_d)                                  context shift along u
     mu_k(a|x) = (1 - eps_k) softmax(beta_k x^T M_{l(k)})_a + eps_k / A
     q_k(x, a) = sigmoid(f(x, a) + r_k * g(x, a))         reward shift
+    (S8: g replaced by an out-of-class interaction h -- misspecified drift)
 
 f and g are fixed random functions that are linear-per-action plus a
 nonlinear term (weight `misspec`), so a per-action logistic reward model is
@@ -39,6 +40,7 @@ class EnvParams:
     u: np.ndarray        # (d,) unit context-shift direction
     loggers: np.ndarray  # (n_loggers, d, A) logging-policy score matrices
     misspec: float
+    H: np.ndarray | None = None  # (d, A) second direction of the out-of-class drift term (S8)
 
     @classmethod
     def sample(cls, seed: int, d: int = 5, n_actions: int = 10,
@@ -56,6 +58,7 @@ class EnvParams:
             u=u / np.linalg.norm(u),
             loggers=rng.normal(scale=0.5, size=(n_loggers, d, n_actions)),
             misspec=misspec,
+            H=rng.normal(scale=0.5, size=(d, n_actions)),  # drawn last: earlier draws unchanged
         )
 
     def f(self, X: np.ndarray) -> np.ndarray:
@@ -66,6 +69,11 @@ class EnvParams:
         """Reward-drift logits for all actions, shape (n, A)."""
         return X @ self.G + self.gb
 
+    def h(self, X: np.ndarray) -> np.ndarray:
+        """Out-of-class reward-drift logits (interaction of two directions), shape (n, A).
+        Not representable by the per-action linear reward model."""
+        return self.gb + 2.0 * np.tanh(X @ self.G) * np.tanh(X @ self.H)
+
 
 @dataclass(frozen=True)
 class WindowSpec:
@@ -73,6 +81,7 @@ class WindowSpec:
 
     context_shift: float = 0.0   # c_k
     reward_shift: float = 0.0    # r_k
+    drift_nonlinear: float = 0.0  # nu_k: drift direction (1 - nu) g + nu h (S8)
     logger_id: int = 0           # l(k)
     logger_beta: float = 1.0     # beta_k (greediness)
     logger_eps: float = 0.2      # eps_k (uniform exploration)
@@ -94,7 +103,9 @@ class Regime:
 
 
 def q(env: EnvParams, spec: WindowSpec, X: np.ndarray) -> np.ndarray:
-    return expit(env.f(X) + spec.reward_shift * env.g(X))
+    drift = env.g(X) if not spec.drift_nonlinear else \
+        (1 - spec.drift_nonlinear) * env.g(X) + spec.drift_nonlinear * env.h(X)
+    return expit(env.f(X) + spec.reward_shift * drift)
 
 
 def mu(env: EnvParams, spec: WindowSpec, X: np.ndarray) -> np.ndarray:
