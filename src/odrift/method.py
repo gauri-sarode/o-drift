@@ -584,12 +584,28 @@ def odrift(history: list, anchor: LoggedData, X_target: np.ndarray, pi, n_action
     return {lam: odrift_split(sp, pi, n_actions, replace(cfg, lam=lam)) for lam in lams}
 
 
+def choose_reference(comps: list, anc: Component, cfg: ODriftConfig, segments: list) -> list | None:
+    """Newest monitor segment the anchor does not contradict (least-contradicted
+    fallback), judged on uncorrected components. None = anchor alone."""
+    keep = [i for i, c in enumerate(comps) if c.diagnostics.eligible]
+    sel = [comps[i] for i in keep] + [anc]
+    pos = {comps[i].index: j for j, i in enumerate(keep)}
+    groups = [g for g in ([pos[k] for k in grp if k in pos] for grp in segments) if g]
+    alpha_ref = segment_select(sel, covariance(sel), cfg.z_group, cfg.z_anchor, cfg.fallback, groups=groups)
+    ref_windows = [sel[j].index for j in np.flatnonzero(alpha_ref[:-1] > 0)]
+    if not ref_windows:
+        return None
+    return next(seg for seg in segments if ref_windows[0] in seg)
+
+
+POOL = dict(selection="segment", z_group=np.inf, z_anchor=np.inf)
+
+
 def odrift_corrected(history: list, anchor: LoggedData, X_target: np.ndarray, pi, n_actions: int,
                      cfg: ODriftConfig, nuisances: tuple, segments: list, mode: str = "pool") -> ODriftResult:
-    """Full O-DRIFT with drift-corrected reuse.
+    """Full O-DRIFT with drift-corrected reuse (plug-in: one data set for everything).
 
-    1. Reference segment: the newest reward-monitor segment that the anchor does
-       not contradict (least-contradicted fallback), chosen on uncorrected components.
+    1. Reference segment: `choose_reference` on uncorrected components.
     2. Every window outside the reference is drift-corrected (reference model's
        direct-method term + its own residual correction; see build_components).
     3. mode="pool": all eligible corrected windows + anchor at minimum variance;
@@ -598,18 +614,46 @@ def odrift_corrected(history: list, anchor: LoggedData, X_target: np.ndarray, pi
     comps, anc = build_components(history, anchor, X_target, pi, n_actions, cfg, nuisances=nuisances)
     if anc is None:
         return combine(comps, None, cfg)
-    keep = [i for i, c in enumerate(comps) if c.diagnostics.eligible]
-    sel = [comps[i] for i in keep] + [anc]
-    pos = {comps[i].index: j for j, i in enumerate(keep)}
-    groups = [g for g in ([pos[k] for k in grp if k in pos] for grp in segments) if g]
-    alpha_ref = segment_select(sel, covariance(sel), cfg.z_group, cfg.z_anchor, cfg.fallback, groups=groups)
-    ref_windows = [sel[j].index for j in np.flatnonzero(alpha_ref[:-1] > 0)]
-    if not ref_windows:  # anchor alone: nothing to correct toward
+    ref_segment = choose_reference(comps, anc, cfg, segments)
+    if ref_segment is None:  # anchor alone: nothing to correct toward
         return combine(comps, anc, cfg, window_groups=segments)
-    ref_segment = next(seg for seg in segments if ref_windows[0] in seg)
     comps_c, anc_c = build_components(history, anchor, X_target, pi, n_actions, cfg, nuisances=nuisances,
                                       reference_windows=ref_segment)
     if mode == "pool":
-        return combine(comps_c, anc_c, replace(cfg, selection="segment", z_group=np.inf, z_anchor=np.inf))
+        return combine(comps_c, anc_c, replace(cfg, **POOL))
     return combine(comps_c, anc_c, replace(cfg, selection="shrink"), 1.0,
                    window_groups=[ref_segment] + [s for s in segments if s is not ref_segment])
+
+
+def make_corrected_split(history: list, anchor: LoggedData, X_target: np.ndarray, n_actions: int,
+                         cfg: ODriftConfig, monitor_alpha: float, seed: int = 0) -> tuple:
+    """Split episode for the honest-interval variant: monitor segments are found on
+    the selection half and used for the segment reward models of BOTH halves."""
+    from .monitor import ResidualStats, reward_changepoints
+    rng = np.random.default_rng(seed + 7)
+    halves = [split_half(d, rng) for d in history]
+    a_sel, a_est = split_half(anchor, rng)
+    xt = rng.permutation(len(X_target))
+    sel_hist, est_hist = [h[0] for h in halves], [h[1] for h in halves]
+    segments = reward_changepoints(ResidualStats(sel_hist, n_actions), monitor_alpha)
+    parts = []
+    for i, (h, a, x) in enumerate(((sel_hist, a_sel, X_target[xt[::2]]), (est_hist, a_est, X_target[xt[1::2]]))):
+        parts.append((h, a, x, fit_all_nuisances(h, a, x, n_actions, cfg, seed + 50 * i, segments=segments)))
+    return parts[0], parts[1], segments
+
+
+def odrift_corrected_split(split: tuple, pi, n_actions: int, cfg: ODriftConfig) -> ODriftResult:
+    """Proposition-2 variant: segments, eligibility, reference and weights from the
+    selection half; estimate, SE and bias allowance from the estimation half."""
+    sel, est, segments = split
+    comps_s, anc_s = build_components(*sel[:3], pi, n_actions, cfg, nuisances=sel[3])
+    if anc_s is None:
+        return combine(build_components(*est[:3], pi, n_actions, cfg, nuisances=est[3])[0], None, cfg)
+    ref_segment = choose_reference(comps_s, anc_s, cfg, segments)
+    ref = ref_segment or None
+    sel_c = build_components(*sel[:3], pi, n_actions, cfg, nuisances=sel[3], reference_windows=ref)
+    est_c = build_components(*est[:3], pi, n_actions, cfg, nuisances=est[3], reference_windows=ref)
+    for c_s, c_e in zip(sel_c[0], est_c[0]):
+        c_e.diagnostics.reasons = c_s.diagnostics.reasons
+    pool_cfg = replace(cfg, **POOL) if ref_segment is not None else cfg
+    return combine(est_c[0], est_c[1], pool_cfg, bound_comps=sel_c)

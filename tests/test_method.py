@@ -142,3 +142,13 @@ def test_drift_corrected_reuse_removes_reward_bias_of_old_windows():
         assert sum(r.weights.get(k, 0) for k in range(6)) > 0.2  # old windows are reused
         errs.append(r.value - truth)
     assert abs(np.mean(errs)) < 0.01
+
+
+def test_corrected_split_variant_runs():
+    from odrift.method import ODriftConfig, make_corrected_split, odrift_corrected_split
+    ep = sample_episode(ENV, REGIMES["S3a"](1.0), 4000, 1000, 6000, seed=0)
+    cfg = ODriftConfig(z_anchor=3.0, fallback="least")
+    sp = make_corrected_split(ep.history, ep.anchor, ep.target_contexts, ENV.n_actions, cfg, 0.001)
+    r = odrift_corrected_split(sp, PI, ENV.n_actions, cfg)
+    assert r.status == "certified" and np.isfinite(r.half_width)
+    assert abs(sum(r.weights.values()) - 1) < 1e-6

@@ -1,0 +1,19 @@
+S0@0.0
+S1@1.0
+S2@0.0
+S3a@0.5
+S3b@0.5
+S4@0.5
+
+variant                                          S0@0.0     S1@1.0     S2@0.0    S3a@0.5    S3b@0.5     S4@0.5   meanlog
+CORR-pool:mon0.001:za=3.0,fb=least,ctx=0.01        5.62       6.42       6.16       6.79       9.59      11.72   -4.901
+CORR-pool:mon0.001:za=2.5,fb=least,ctx=0.01        5.62       6.42       6.16       7.72       9.62      11.82   -4.877
+CORR-shrink:mon0.001:za=3.0,fb=least,ctx=0.01       5.62       6.42       6.16       7.66      10.48      17.08   -4.803
+mon0.001:shrink:za=3.0,fb=least,sn=0,ctx=0.01       5.62       6.42       6.16       7.71      10.57      17.54   -4.796
+CORR-shrink:mon0.001:za=2.5,fb=least,ctx=0.01       5.62       6.42       6.16       8.60      10.64      17.31   -4.779
+mon0.001:shrink:za=2.5,fb=least,sn=0,ctx=0.01       5.62       6.42       6.16       8.63      10.72      17.61   -4.774
+mon0.001:seg:za=3.0,fb=least,sn=0,ctx=0.01         5.62       6.42       6.16       7.91      10.94      19.17   -4.771
+mon0.001:seg:za=2.5,fb=least,sn=0,ctx=0.01         5.62       6.42       6.16       8.84      11.11      19.24   -4.750
+ch:zg=3.5,za=3.0,fb=least,sn=0,ctx=0.01            5.99       6.61       6.70      10.43      13.26      19.79   -4.658
+ch:zg=3.5,za=2.5,fb=least,sn=0,ctx=0.01            5.99       6.61       6.70      11.07      13.26      19.79   -4.649
+(RMSE x1e3; fraction of anchor-only outputs stored in results/05_compare_fixes.json)

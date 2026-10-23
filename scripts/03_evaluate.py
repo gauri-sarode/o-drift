@@ -22,7 +22,9 @@ import numpy as np
 import yaml
 
 from odrift import baselines as bl
-from odrift.method import ODriftConfig, build_components, combine, covariance, fit_all_nuisances, make_split, odrift_split, select_weights
+from odrift.method import (ODriftConfig, build_components, combine, covariance, fit_all_nuisances,
+                           make_corrected_split, odrift_corrected, odrift_corrected_split, select_weights)
+from odrift.monitor import ResidualStats, reward_changepoints
 from odrift.nuisance import RewardModel, crossfit_rewards
 from odrift.regimes import REGIMES
 from odrift.simulator import EnvParams, LoggedData, Policy, sample_episode, true_value
@@ -30,7 +32,8 @@ from odrift.simulator import EnvParams, LoggedData, Policy, sample_episode, true
 ROOT = Path(__file__).resolve().parents[1]
 PROTOCOL = yaml.safe_load((ROOT / "configs/protocol.yaml").read_text())
 SIM, TUNE = PROTOCOL["simulator"], PROTOCOL["tuning"]
-CFG = ODriftConfig(delta_variance=TUNE["delta_split"]["variance"], delta_bias=TUNE["delta_split"]["bias"])
+CFG = ODriftConfig(delta_variance=TUNE["delta_split"]["variance"], delta_bias=TUNE["delta_split"]["bias"],
+                   **TUNE["odrift_fixed"])
 Z95 = 1.959964
 
 
@@ -59,7 +62,7 @@ def method_grid(split, tuned):
         "recent": TUNE["baseline_grids"]["recent_windows"],
         "decay": TUNE["baseline_grids"]["decay_gamma"],
         "liu": TUNE["baseline_grids"]["liu_recent_windows"],
-        "odrift": [(g, a) for g in TUNE["z_group_grid"] for a in TUNE["z_anchor_grid"]],
+        "odrift": [(m, a) for m in TUNE["odrift_grid"]["monitor_alpha"] for a in TUNE["odrift_grid"]["z_anchor"]],
     }
     if split == "test":
         grid = {fam: [tuple(tuned[fam]) if isinstance(tuned[fam], list) else tuned[fam]] for fam in grid}
@@ -76,7 +79,13 @@ def run_one(args):
     has_anchor = n_anchor >= CFG.min_anchor
 
     # ---- policy-independent fits, shared by all candidate policies
-    nuis = fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, A, CFG, data_seed)
+    # per-window, always-transport nuisances for baselines/oracle/selector ablations
+    nuis = fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, A, replace(CFG, context_alpha=0.0), data_seed)
+    stats = ResidualStats(ep.history, A)
+    monitor_alphas = sorted({m for m, _ in grid["odrift"]})
+    segments = {m: reward_changepoints(stats, m) for m in monitor_alphas}
+    seg_nuis = {m: fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, A, CFG, data_seed,
+                                     segments=segments[m]) for m in monitor_alphas}
     datasets = {"pooled": LoggedData.concat(ep.history + ([ep.anchor] if n_anchor else []))}
     if has_anchor:
         datasets["anchor"] = ep.anchor
@@ -100,7 +109,9 @@ def run_one(args):
         e = dr_on("pooled")
         put("pooled_dr", e.value, Z95 * e.se)
         if not has_anchor:
-            r = odrift_point(ep, pi, A, nuis, grid["odrift"][0])
+            m, za = grid["odrift"][0]
+            r = odrift_corrected(ep.history, ep.anchor, ep.target_contexts, pi, A, replace(CFG, z_anchor=za),
+                                 seg_nuis[m], segments[m])
             put("odrift", r.value, r.half_width, status=r.status)
             continue
         e = dr_on("anchor")
@@ -127,12 +138,13 @@ def run_one(args):
         comps, anc = build_components(ep.history, ep.anchor, ep.target_contexts, pi, A, CFG, nuisances=nuis)
         r = bl.transport_pool(comps, anc, CFG)
         put("transport_dr", r.value, r.z_v * r.se)
-        for zg, za in grid["odrift"]:
-            r = combine(comps, anc, replace(CFG, z_group=zg, z_anchor=za))
+        for m, za in grid["odrift"]:
+            r = odrift_corrected(ep.history, ep.anchor, ep.target_contexts, pi, A, replace(CFG, z_anchor=za),
+                                 seg_nuis[m], segments[m])
             deficient = [k for k, reasons in r.reasons.items() if "target_support" in reasons]
-            put(f"odrift[{zg},{za}]", r.value, r.half_width, hw_narrow=float(r.z_v * r.se),
+            put(f"odrift[{m},{za}]", r.value, r.half_width, hw_narrow=float(r.z_v * r.se),
                 status=r.status, weights=[r.weights.get(k, 0.0) for k in range(K + 1)],
-                deficient=deficient, ineligible=sorted(r.reasons))
+                deficient=deficient, ineligible=sorted(r.reasons), n_segments=len(segments[m]))
         # oracle selector: true transfer biases, same components
         keep = [c for c in comps if c.diagnostics.eligible] + [anc]
         b = np.array([v_k[c.index] - v_t for c in keep[:-1]] + [0.0])
@@ -143,24 +155,19 @@ def run_one(args):
 
     # sample-split O-DRIFT (Proposition 2 conditions), interval only, per policy
     if has_anchor:
-        sp = make_split(ep.history, ep.anchor, ep.target_contexts, A, CFG, data_seed)
+        splits = {m: make_corrected_split(ep.history, ep.anchor, ep.target_contexts, A, CFG, m, data_seed)
+                  for m in monitor_alphas}
         for p_idx, pi in enumerate(pis):
             v_t = truths[p_idx][0]
-            for zg, za in grid["odrift"]:
-                r = odrift_split(sp, pi, A, replace(CFG, z_group=zg, z_anchor=za))
-                rec.setdefault(f"odrift_split[{zg},{za}]", []).append(
+            for m, za in grid["odrift"]:
+                r = odrift_corrected_split(splits[m], pi, A, replace(CFG, z_anchor=za))
+                rec.setdefault(f"odrift_split[{m},{za}]", []).append(
                     dict(est=r.value, err=r.value - v_t, hw=r.half_width))
     return rec
 
 
 def _val_hw(r):
     return r.value, r.half_width
-
-
-def odrift_point(ep, pi, A, nuis, setting):
-    zg, za = setting
-    comps, anc = build_components(ep.history, ep.anchor, ep.target_contexts, pi, A, CFG, nuisances=nuis)
-    return combine(comps, anc, replace(CFG, z_group=zg, z_anchor=za))
 
 
 def liu_with_model(r_hat, anchor, X_target, pi, A):
@@ -183,6 +190,7 @@ def main():
     ap.add_argument("--reps", type=int, default=None, help="data seeds per env seed")
     ap.add_argument("--cells", nargs="*", default=None)
     ap.add_argument("--n-anchor", type=int, default=SIM["n_anchor_default"])
+    ap.add_argument("--out", default=None, help="output path (default results/03_{split}[_anchorN].json)")
     args = ap.parse_args()
     split = PROTOCOL["splits"][args.split]
     tuned = None
@@ -216,7 +224,7 @@ def main():
             print(f"{key:10s} n={len(results)}  best: " + "  ".join(f"{m}={v:.4f}" for m, v in best), flush=True)
 
     suffix = "" if args.n_anchor == SIM["n_anchor_default"] else f"_anchor{args.n_anchor}"
-    path = ROOT / f"results/03_{args.split}{suffix}.json"
+    path = ROOT / (args.out or f"results/03_{args.split}{suffix}.json")
     path.write_text(json.dumps(out))
     print(f"wrote {path}")
 
