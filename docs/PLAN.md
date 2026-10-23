@@ -153,3 +153,15 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
 10. Context-shift gate: LR test of a source-vs-target logistic classifier; transport
    only when it rejects (S0/S2 false-reject ~1%; S1 shifts >= ~0.06 sd detected).
    Motivation: always-on density ratios cost ~8% RMSE in S0/S2.
+11. **Per-segment reward models (2026-10-23)**: fit one cross-fitted reward model per
+   reward-monitor segment, shared by its windows (valid: the windows share q by the
+   monitor's test). Removes most of the residual gap to pooled DR in S0/S2 that per-window
+   models (5k rows each) caused. Context gate: negligible effect (kept at α=0.01, harmless).
+   Best variant (monitor α=0.001, segment models, shrinkage vs newest segment, z_a=3,
+   least fallback, ctx gate 0.01) on full dev:
+   S0 5.62 | S1 6.42 | S2 6.16 | S3a 7.71 | S3b 10.57 | S4 17.54  (x1e-3)
+   ratio to per-cell best: 1.04 | 0.98 | 1.02 | 0.99 | 1.06 | 1.31; worst 1.31, mean 1.07.
+   Best or within 6% of the best tuned baseline in 5/6 cells — each baseline has a
+   >=1.48x failure somewhere. S4 remains the weak cell (precise-but-biased old data).
+   Still unlikely to meet the frozen per-cell 0.9x bar; the supportable claim is
+   uniform near-optimality across drift mechanisms.
