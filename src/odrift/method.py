@@ -320,6 +320,30 @@ def segment_select(comps: list, S: np.ndarray, z_group: float, z_anchor: float,
     return alpha
 
 
+def shrink_select(comps: list, S: np.ndarray, cfg, lam: float) -> np.ndarray:
+    """Soft version of segment_select: debiased-MSE weights with the bias of
+    every component measured against the reference r = segment_select's
+    (newest anchor-consistent segment + anchor) instead of the noisy anchor.
+
+    d = V - (r . V),  Cov(d) = P S P^T with P = I - 1 r^T. Assumes the
+    reference is unbiased (it passed the anchor veto); older segments whose
+    discrepancy is small relative to its noise keep partial weight instead
+    of an all-or-nothing split.
+    """
+    if cfg.shrink_ref > 0:
+        # reference: the most recent `shrink_ref` eligible windows + anchor
+        idx = list(range(max(0, len(comps) - 1 - cfg.shrink_ref), len(comps)))
+        ref = np.zeros(len(comps))
+        ref[idx] = select_weights(S[np.ix_(idx, idx)], np.zeros(len(idx)), 0.0)
+    else:
+        ref = segment_select(comps, S, cfg.z_group, cfg.z_anchor, cfg.fallback, cfg.grouping)
+    values = np.array([c.value for c in comps])
+    d = values - ref @ values
+    P = np.eye(len(comps)) - np.outer(np.ones(len(comps)), ref)
+    C = P @ S @ P.T
+    return select_weights(S, np.zeros(len(comps)), 0.0, Q=mse_objective(S, d, C, lam))
+
+
 # ------------------------------------------------------------------ O-DRIFT
 
 @dataclass
@@ -330,6 +354,7 @@ class ODriftConfig:
     z_anchor: float = 2.0        # anchor veto threshold for a homogeneous group
     fallback: str = "anchor"     # all groups vetoed -> "anchor" alone | "least" contradicted group + anchor
     grouping: str = "greedy"     # "greedy" window-vs-group | "changepoint" binary segmentation
+    shrink_ref: int = 0          # "shrink": 0 = segment reference; m > 0 = newest m windows + anchor
     anchor_sn: bool = False      # self-normalized DR for the anchor component
     delta_variance: float = 0.025
     delta_bias: float = 0.025
@@ -412,6 +437,8 @@ def combine(comps: list, anchor_comp, cfg: ODriftConfig, lam: float | None = Non
     B = bias_bounds(sel, sel_anchor, S_sel, z_k)
     if cfg.selection == "segment":
         alpha = segment_select(sel, S_sel, cfg.z_group, cfg.z_anchor, cfg.fallback, cfg.grouping)
+    elif cfg.selection == "shrink":
+        alpha = shrink_select(sel, S_sel, cfg, lam)
     elif cfg.selection == "mse":
         d_sel, C_sel = diff_moments(sel, S_sel)
         alpha = select_weights(S_sel, B, lam, Q=mse_objective(S_sel, d_sel, C_sel, lam))

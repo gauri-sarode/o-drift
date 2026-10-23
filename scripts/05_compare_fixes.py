@@ -36,7 +36,7 @@ def name(zg, za, fb, sn):
 
 
 def run_one(args):
-    regime_name, intensity, env_seed, data_seed, truths, z_groups, z_anchors, fallbacks, sns, groupings = args
+    regime_name, intensity, env_seed, data_seed, truths, z_groups, z_anchors, fallbacks, sns, groupings, shrink_refs = args
     env = EnvParams.sample(env_seed, d=SIM["d"], n_actions=SIM["n_actions"], misspec=SIM["misspec"])
     regime = REGIMES[regime_name](intensity, K=SIM["n_windows"])
     pis = [Policy.near_optimal(env, noise=s, seed=env_seed) for s in TUNE["candidate_policies"]]
@@ -64,6 +64,7 @@ def main():
     ap.add_argument("--fallback", nargs="*", default=None)
     ap.add_argument("--sn", type=int, nargs="*", default=None)
     ap.add_argument("--grouping", nargs="*", default=["greedy"])
+    ap.add_argument("--shrink-ref", type=int, nargs="*", default=[])
     ap.add_argument("--out", default="results/05_compare_fixes.json")
     args = ap.parse_args()
     global Z_ANCHOR, FALLBACKS, SN
@@ -78,7 +79,7 @@ def main():
     with ProcessPoolExecutor() as pool:
         for key, cell in dev["cells"].items():
             regime_name, intensity = key.split("@")[0], float(key.split("@")[1])
-            jobs = [(regime_name, intensity, e, start + s, cell["truths"][str(e)], z_groups, Z_ANCHOR, FALLBACKS, SN, args.grouping)
+            jobs = [(regime_name, intensity, e, start + s, cell["truths"][str(e)], z_groups, Z_ANCHOR, FALLBACKS, SN, args.grouping, args.shrink_ref)
                     for e in DEV["env_seeds"] for s in range(args.reps)]
             res = list(pool.map(run_one, jobs))
             summary[key] = {}
@@ -90,9 +91,9 @@ def main():
     # (grids are passed in the job tuple: worker processes are spawned and would not see globals)
     # mean log RMSE across dev cells -- the protocol's selection criterion
     score = {v: float(np.mean([np.log(summary[k][v]["rmse"]) for k in summary])) for v in summary[next(iter(summary))]}
-    print(f"\n{'variant':34s}" + "".join(f"{k:>11s}" for k in summary) + "   meanlog")
+    print(f"\n{'variant':44s}" + "".join(f"{k:>11s}" for k in summary) + "   meanlog")
     for v in sorted(score, key=score.get):
-        print(f"{v:34s}" + "".join(f"{summary[k][v]['rmse'] * 1e3:11.2f}" for k in summary) + f"   {score[v]:.3f}")
+        print(f"{v:44s}" + "".join(f"{summary[k][v]['rmse'] * 1e3:11.2f}" for k in summary) + f"   {score[v]:.3f}")
     print("(RMSE x1e3; fraction of anchor-only outputs stored in results/05_compare_fixes.json)")
     (ROOT / args.out).write_text(json.dumps(dict(summary=summary, score=score), indent=2))
 
