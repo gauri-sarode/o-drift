@@ -52,6 +52,14 @@ tuning:  # dev split only
     recent_windows: [1, 2, 3, 4, 6, 8, 12]  # sliding-window DR (+ anchor)
     decay_gamma: [0.5, 0.7, 0.8, 0.9, 0.95] # exponential-decay DR
     liu_recent_windows: [1, 3, 6, 12]       # windows used to fit r_hat in regression-assisted DR
+    # Strong-baseline suite (added 2026-10-23, before any run of these baselines):
+    slope_kappa: [1.0, 2.0, 3.0]            # SLOPE (Su et al. 2020) interval multiplier
+    magic_z_ref: [0.67, 1.0, 1.96]          # MAGIC (Thomas & Brunskill 2016) reference-CI z
+    transport_recent: [1, 2, 3, 4, 6, 8, 12]  # transport DR on newest k windows + anchor
+    transport_decay: [0.5, 0.7, 0.8, 0.9, 0.95]  # transport DR, weights ~ gamma^(K-k)/var_k
+    # untuned: anchor-validated selection, multi-logger balanced DR, monitor-informed selection.
+    # recent/decay full grids are also run on test, ONLY to report per-cell oracle-tuned
+    # upper bounds (labelled as such); comparisons use the dev-tuned settings.
   selection_rule: >-
     For every method family (O-DRIFT included), pick the single hyperparameter
     setting minimizing the mean over dev cells of log RMSE (all candidate policies

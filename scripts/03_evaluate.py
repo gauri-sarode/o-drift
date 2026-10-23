@@ -27,7 +27,7 @@ from odrift.method import (ODriftConfig, build_components, combine, covariance, 
 from odrift.monitor import ResidualStats, reward_changepoints
 from odrift.nuisance import RewardModel, crossfit_rewards
 from odrift.regimes import REGIMES
-from odrift.simulator import EnvParams, LoggedData, Policy, sample_episode, true_value
+from odrift.simulator import EnvParams, LoggedData, Policy, mu, sample_episode, true_value
 
 ROOT = Path(__file__).resolve().parents[1]
 PROTOCOL = yaml.safe_load((ROOT / "configs/protocol.yaml").read_text())
@@ -63,9 +63,15 @@ def method_grid(split, tuned):
         "decay": TUNE["baseline_grids"]["decay_gamma"],
         "liu": TUNE["baseline_grids"]["liu_recent_windows"],
         "odrift": [(m, a) for m in TUNE["odrift_grid"]["monitor_alpha"] for a in TUNE["odrift_grid"]["z_anchor"]],
+        "slope": TUNE["baseline_grids"]["slope_kappa"],
+        "magic": TUNE["baseline_grids"]["magic_z_ref"],
+        "trecent": TUNE["baseline_grids"]["transport_recent"],
+        "tdecay": TUNE["baseline_grids"]["transport_decay"],
     }
     if split == "test":
+        full = {k: grid[k] for k in ("recent", "decay")}  # for oracle-tuned upper bounds only
         grid = {fam: [tuple(tuned[fam]) if isinstance(tuned[fam], list) else tuned[fam]] for fam in grid}
+        grid.update(full)
     return grid
 
 
@@ -79,11 +85,11 @@ def run_one(args):
     has_anchor = n_anchor >= CFG.min_anchor
 
     # ---- policy-independent fits, shared by all candidate policies
-    # per-window, always-transport nuisances for baselines/oracle/selector ablations
-    nuis = fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, A, replace(CFG, context_alpha=0.0), data_seed)
     stats = ResidualStats(ep.history, A)
     monitor_alphas = sorted({m for m, _ in grid["odrift"]})
     segments = {m: reward_changepoints(stats, m) for m in monitor_alphas}
+    # per-window, always-transport nuisances for baselines/oracle/selector ablations
+    nuis = fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, A, replace(CFG, context_alpha=0.0), data_seed)
     seg_nuis = {m: fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, A, CFG, data_seed,
                                      segments=segments[m]) for m in monitor_alphas}
     datasets = {"pooled": LoggedData.concat(ep.history + ([ep.anchor] if n_anchor else []))}
@@ -91,7 +97,22 @@ def run_one(args):
         datasets["anchor"] = ep.anchor
         for B in grid["recent"]:
             datasets[f"recent{B}"] = LoggedData.concat(ep.history[K - B:] + [ep.anchor])
+    # monitor-informed selection (selector parity): newest reward segment + anchor, no correction
+    m0 = grid["odrift"][0][0]
+    if has_anchor:
+        datasets["monitor_seg"] = LoggedData.concat([ep.history[k] for k in sorted(segments[m0][0])] + [ep.anchor])
     q_cache = {k: crossfit_rewards(d, A, seed=data_seed)[0] for k, d in datasets.items()}
+    # multi-logger balanced propensities from event-time logger artifacts (A4); in S6 the
+    # artifact for the faulty windows is the wrongly recorded logger, as in the logs
+    if has_anchor:
+        pooled_d = datasets["pooled"]
+        specs = list(regime.windows) + [regime.target]
+        counts = np.bincount(pooled_d.window, minlength=K + 1)
+        mixture = np.zeros((len(pooled_d), A))
+        for k, spec in enumerate(specs):
+            if counts[k]:
+                art = spec if spec.recorded_logger_id is None else replace(spec, logger_id=spec.recorded_logger_id)
+                mixture += counts[k] / counts.sum() * mu(env, art, pooled_d.X)
     liu_models = {B: RewardModel(A).fit(LoggedData.concat(ep.history[K - B:])) for B in grid["liu"]} if has_anchor else {}
 
     rec = {}  # method -> list over policies of (estimate, half_width, extra)
@@ -135,9 +156,37 @@ def run_one(args):
             e = liu_with_model(liu_models[B], ep.anchor, ep.target_contexts, pi, A)
             put(f"liu_reg[{B}]", e.value, Z95 * e.se)
 
+        # ---- strong-baseline suite
+        probs_pooled = pi.probs(pooled.X)
+        e = bl.balanced_mixture_dr(pooled, mixture, probs_pooled, q_cache["pooled"])
+        put("balanced_dr", e.value, Z95 * e.se)
+        e = dr_on("monitor_seg")
+        put("monitor_select_dr", e.value, Z95 * e.se)
+        fam_v, fam_var = bl.nested_family(scores, pooled.window, K)
+        for kappa in grid["slope"]:
+            j = bl.slope_select(fam_v, fam_var, kappa)
+            put(f"slope[{kappa}]", fam_v[j], Z95 * np.sqrt(fam_var[j]), chosen=int(j))
+        for zr in grid["magic"]:
+            w = bl.magic_weights(fam_v, fam_var, zr)
+            put(f"magic[{zr}]", float(w @ fam_v), Z95 * float(np.sqrt(w @ np.minimum.outer(fam_var, fam_var) @ w)))
+        j = bl.anchor_validated_select(fam_v, fam_var)
+        put("anchor_validated", fam_v[j], Z95 * np.sqrt(fam_var[j]), chosen=int(j))
+
         comps, anc = build_components(ep.history, ep.anchor, ep.target_contexts, pi, A, CFG, nuisances=nuis)
         r = bl.transport_pool(comps, anc, CFG)
         put("transport_dr", r.value, r.z_v * r.se)
+        elig = [c for c in comps if c.diagnostics.eligible]
+        for B in grid["trecent"]:
+            sub = [c for c in elig if c.index >= K - B] + [anc]
+            Ssub = covariance(sub)
+            a_ = select_weights(Ssub, np.zeros(len(sub)), 0.0)
+            put(f"trecent[{B}]", float(a_ @ [c.value for c in sub]), Z95 * float(np.sqrt(a_ @ Ssub @ a_)))
+        for g in grid["tdecay"]:
+            sub = elig + [anc]
+            Ssub = covariance(sub)
+            a_ = np.array([g ** (K - c.index) for c in sub]) / np.diag(Ssub)
+            a_ /= a_.sum()
+            put(f"tdecay[{g}]", float(a_ @ [c.value for c in sub]), Z95 * float(np.sqrt(a_ @ Ssub @ a_)))
         for m, za in grid["odrift"]:
             r = odrift_corrected(ep.history, ep.anchor, ep.target_contexts, pi, A, replace(CFG, z_anchor=za),
                                  seg_nuis[m], segments[m])

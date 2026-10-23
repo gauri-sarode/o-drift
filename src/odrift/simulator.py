@@ -118,16 +118,21 @@ class LoggedData:
     pscore: np.ndarray   # (n,) mu(A|X) as logged at event time
     window: np.ndarray   # (n,) window index (K = target/anchor)
     logger_id: np.ndarray  # (n,)
+    probs_all: np.ndarray | None = None  # (n, A) logged mu(.|X) at event time (A4 artifacts)
 
     def __len__(self) -> int:
         return len(self.A)
 
     def subset(self, mask: np.ndarray) -> "LoggedData":
-        return LoggedData(**{k: v[mask] for k, v in vars(self).items()})
+        return LoggedData(**{k: (None if v is None else v[mask]) for k, v in vars(self).items()})
 
     @staticmethod
     def concat(parts: list) -> "LoggedData":
-        return LoggedData(**{k: np.concatenate([getattr(p, k) for p in parts]) for k in vars(parts[0])})
+        out = {}
+        for k in vars(parts[0]):
+            vals = [getattr(p, k) for p in parts]
+            out[k] = None if any(v is None for v in vals) else np.concatenate(vals)
+        return LoggedData(**out)
 
 
 def log_window(env: EnvParams, spec: WindowSpec, n: int, window: int,
@@ -141,7 +146,7 @@ def log_window(env: EnvParams, spec: WindowSpec, n: int, window: int,
     if spec.recorded_logger_id is not None:
         probs = mu(env, replace(spec, logger_id=spec.recorded_logger_id), X)
     return LoggedData(
-        X=X, A=A, R=R, pscore=probs[np.arange(n), A],
+        X=X, A=A, R=R, pscore=probs[np.arange(n), A], probs_all=probs,
         window=np.full(n, window), logger_id=np.full(n, spec.logger_id),
     )
 

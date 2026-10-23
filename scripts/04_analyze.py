@@ -16,8 +16,9 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-FAMILY = re.compile(r"^(recent_dr|decay_dr|liu_reg|odrift_split|odrift)\[(.+)\]$")
-FAMILY_KEY = {"recent_dr": "recent", "decay_dr": "decay", "liu_reg": "liu", "odrift": "odrift"}
+FAMILY = re.compile(r"^(recent_dr|decay_dr|liu_reg|odrift_split|odrift|slope|magic|trecent|tdecay)\[(.+)\]$")
+FAMILY_KEY = {"recent_dr": "recent", "decay_dr": "decay", "liu_reg": "liu", "odrift": "odrift",
+              "slope": "slope", "magic": "magic", "trecent": "trecent", "tdecay": "tdecay"}
 BASELINES = ["pooled_dr", "anchor_dr", "recent_dr", "decay_dr", "minvar_dr", "liu_reg", "transport_dr"]
 
 
@@ -69,7 +70,8 @@ def tune(data):
         best = min(means, key=means.get)
         report[fam] = dict(sorted(means.items(), key=lambda kv: kv[1]))
         parsed = [float(x) for x in best.split(",")]
-        tuned[fam] = parsed if len(parsed) > 1 else (int(parsed[0]) if parsed[0].is_integer() and fam != "decay" else parsed[0])
+        int_families = {"recent", "liu", "trecent"}  # window counts; everything else stays float
+        tuned[fam] = parsed if len(parsed) > 1 else (int(parsed[0]) if fam in int_families else parsed[0])
     return tuned, report
 
 
@@ -125,7 +127,20 @@ def main():
     od, ods = name("odrift", "odrift"), name("odrift", "odrift_split")
     tuned_baselines = ["pooled_dr", "anchor_dr", name("recent", "recent_dr"), name("decay", "decay_dr"),
                        "minvar_dr", name("liu", "liu_reg"), "transport_dr"]
-    methods = tuned_baselines + [od, ods, "ablate_mse", "ablate_bound", "oracle"]
+    for fam, prefix in (("slope", "slope"), ("magic", "magic"), ("trecent", "trecent"), ("tdecay", "tdecay")):
+        if fam in tuned:
+            tuned_baselines.append(name(fam, prefix))
+    tuned_baselines += ["anchor_validated", "balanced_dr", "monitor_select_dr"]
+    # per-cell oracle-tuned upper bounds (use the truth to pick k / gamma): reported, never "tuned"
+    for key, cell in data["cells"].items():
+        for fam in ("recent_dr", "decay_dr"):
+            members = [m for m in cell["reps"][0] if m.startswith(fam + "[")]
+            if members:
+                best_m = min(members, key=lambda m: rmse(cell, m))
+                for r in cell["reps"]:
+                    r[f"{fam}_oracletuned"] = r[best_m]
+    methods = tuned_baselines + [od, ods, "recent_dr_oracletuned", "decay_dr_oracletuned",
+                                 "ablate_mse", "ablate_bound", "oracle"]
     rows = table(data, methods)
     print_table(rows)
 

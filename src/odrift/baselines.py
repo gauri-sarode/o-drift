@@ -90,3 +90,64 @@ def transport_pool(comps: list, anchor_comp, cfg: ODriftConfig = ODriftConfig())
     Diagnostics-based eligibility is kept."""
     from dataclasses import replace
     return combine(comps, anchor_comp, replace(cfg, selection="segment", z_group=np.inf, z_anchor=np.inf))
+
+
+# ------------------------------------------------- data-driven selectors over a nested family
+# Family j = 0..J: estimator on the anchor plus the newest j windows (more data, more
+# potential drift bias). Values/SEs come from the same per-record DR scores, so for nested
+# record sets Cov(V_i, V_j) = Var(V_max(i,j)) (the larger set's variance).
+
+def nested_family(scores: np.ndarray, window: np.ndarray, K: int) -> tuple:
+    """(values, variances) for j = 0..K: anchor (window K) + windows K-j..K-1."""
+    vals, vars_ = [], []
+    for j in range(K + 1):
+        s = scores[window >= K - j]
+        vals.append(s.mean())
+        vars_.append(s.var(ddof=1) / len(s))
+    return np.array(vals), np.array(vars_)
+
+
+def _nested_cov(var: np.ndarray) -> np.ndarray:
+    return np.minimum.outer(var, var)
+
+
+def slope_select(vals: np.ndarray, var: np.ndarray, kappa: float) -> int:
+    """SLOPE (Su, Srinath & Krishnamurthy, ICML 2020): Lepski-style rule over a family
+    ordered by decreasing variance -- the largest j whose interval intersects all
+    intervals of the less-biased members j' <= j."""
+    lo, hi, best = -np.inf, np.inf, 0
+    for j in range(len(vals)):
+        lo = max(lo, vals[j] - kappa * np.sqrt(var[j]))
+        hi = min(hi, vals[j] + kappa * np.sqrt(var[j]))
+        if lo > hi:
+            break
+        best = j
+    return best
+
+
+def magic_weights(vals: np.ndarray, var: np.ndarray, z_ref: float) -> np.ndarray:
+    """MAGIC (Thomas & Brunskill, ICML 2016): blend weights minimizing x'Omega x + (x'b)^2,
+    with b_j the distance from V_j to the reference (anchor-only, j=0) confidence interval."""
+    from .method import select_weights
+    lo, hi = vals[0] - z_ref * np.sqrt(var[0]), vals[0] + z_ref * np.sqrt(var[0])
+    b = np.maximum(0.0, np.maximum(lo - vals, vals - hi))
+    Q = _nested_cov(var) + np.outer(b, b)
+    return select_weights(Q, b, 0.0, Q=Q)
+
+
+def anchor_validated_select(vals: np.ndarray, var: np.ndarray) -> int:
+    """Pick the member minimizing estimated MSE: debiased squared distance to the anchor
+    estimate (j=0) plus own variance. For nested sets Var(V_j - V_0) = var_0 - var_j."""
+    bias2 = np.maximum(0.0, (vals - vals[0]) ** 2 - (var[0] - var))
+    bias2[0] = 0.0
+    return int(np.argmin(bias2 + var))
+
+
+def balanced_mixture_dr(data: LoggedData, mixture_probs: np.ndarray, pi_probs: np.ndarray,
+                        q_hat: np.ndarray) -> Estimate:
+    """Multi-logger DR with the balanced (mixture) propensity mu_bar(a|x) = sum_k (n_k/N) mu_k(a|x)
+    (Agarwal et al. 2017; Kallus, Saito & Uehara, ICML 2021). Optimal under a stationary reward."""
+    idx = np.arange(len(data))
+    rho = pi_probs[idx, data.A] / mixture_probs[idx, data.A]
+    scores = (pi_probs * q_hat).sum(axis=1) + rho * (data.R - q_hat[idx, data.A])
+    return _weighted_estimate(scores, np.ones(len(data)))
