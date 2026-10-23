@@ -77,3 +77,21 @@ def test_split_variant_runs_and_weights_sum_to_one():
     out = odrift(ep.history, ep.anchor, ep.target_contexts, PI, ENV.n_actions, split=True, lams=[0.5, 2.0])
     for res in out.values():
         assert abs(sum(res.weights.values()) - 1) < 1e-6
+
+
+def test_changepoint_finds_abrupt_reward_change():
+    from odrift.method import ODriftConfig, build_components, changepoint_groups, covariance
+    regime = REGIMES["S3a"](2.0)
+    ep = sample_episode(ENV, regime, 5000, 1000, 5000, seed=1)
+    comps, _ = build_components(ep.history, ep.anchor, ep.target_contexts, PI, ENV.n_actions, ODriftConfig())
+    vals = np.array([c.value for c in comps])
+    groups = changepoint_groups(vals, covariance(comps), 3.0)
+    assert sorted(groups[0]) == list(range(6, 12)), groups
+
+
+def test_changepoint_keeps_stationary_history_whole():
+    from odrift.method import ODriftConfig, build_components, changepoint_groups, covariance
+    ep = sample_episode(ENV, REGIMES["S1"](1.0), 5000, 1000, 5000, seed=2)
+    comps, _ = build_components(ep.history, ep.anchor, ep.target_contexts, PI, ENV.n_actions, ODriftConfig())
+    groups = changepoint_groups(np.array([c.value for c in comps]), covariance(comps), 3.0)
+    assert len(groups) == 1, groups

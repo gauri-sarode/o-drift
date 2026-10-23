@@ -254,8 +254,41 @@ def homogeneous_groups(values: np.ndarray, S: np.ndarray, z_crit: float) -> list
     return groups
 
 
+def _block_diff_z(values: np.ndarray, S: np.ndarray, left: list, right: list) -> float:
+    """z-statistic of the difference between two blocks' minimum-variance means."""
+    w1 = select_weights(S[np.ix_(left, left)], np.zeros(len(left)), 0.0)
+    w2 = select_weights(S[np.ix_(right, right)], np.zeros(len(right)), 0.0)
+    diff = w1 @ values[left] - w2 @ values[right]
+    var = w1 @ S[np.ix_(left, left)] @ w1 + w2 @ S[np.ix_(right, right)] @ w2 - 2 * w1 @ S[np.ix_(left, right)] @ w2
+    return abs(diff) / np.sqrt(max(var, 1e-18))
+
+
+def changepoint_groups(values: np.ndarray, S: np.ndarray, z_crit: float) -> list:
+    """Binary segmentation of the window sequence into reward-homogeneous segments.
+
+    For a segment, every split point is scored by the z-statistic between the
+    minimum-variance means on either side; the segment is split at the best
+    point if it exceeds z_crit, recursively. Comparing blocks rather than
+    single windows gives far more power for the same drift (e.g. a 6 | 6 split
+    has sd ~ sqrt(1/6 + 1/6) of one window's). Returns segments newest-first.
+    """
+    segments, stack = [], [list(range(len(values)))]
+    while stack:
+        seg = stack.pop()
+        best_z, best_s = -np.inf, None
+        for s in range(1, len(seg)):
+            z = _block_diff_z(values, S, seg[:s], seg[s:])
+            if z > best_z:
+                best_z, best_s = z, s
+        if best_s is not None and best_z > z_crit:
+            stack += [seg[:best_s], seg[best_s:]]
+        else:
+            segments.append(seg)
+    return sorted(segments, key=lambda g: -max(g))
+
+
 def segment_select(comps: list, S: np.ndarray, z_group: float, z_anchor: float,
-                   fallback: str = "anchor") -> np.ndarray:
+                   fallback: str = "anchor", grouping: str = "greedy") -> np.ndarray:
     """Weights over `comps` (anchor last): the most recent homogeneous group
     that the anchor does not contradict, pooled with the anchor at minimum
     variance. If every group is contradicted, fall back to the anchor alone
@@ -267,7 +300,8 @@ def segment_select(comps: list, S: np.ndarray, z_group: float, z_anchor: float,
         return alpha
     values = np.array([c.value for c in comps])
     best_z, best_group = np.inf, None
-    for group in homogeneous_groups(values[:h], S[:h, :h], z_group):
+    grouper = changepoint_groups if grouping == "changepoint" else homogeneous_groups
+    for group in grouper(values[:h], S[:h, :h], z_group):
         w = select_weights(S[np.ix_(group, group)], np.zeros(len(group)), 0.0)
         diff = w @ values[group] - values[h]
         var = w @ S[np.ix_(group, group)] @ w + S[h, h] - 2 * w @ S[group, h]
@@ -295,6 +329,7 @@ class ODriftConfig:
     z_group: float = 3.0         # homogeneity test threshold between windows
     z_anchor: float = 2.0        # anchor veto threshold for a homogeneous group
     fallback: str = "anchor"     # all groups vetoed -> "anchor" alone | "least" contradicted group + anchor
+    grouping: str = "greedy"     # "greedy" window-vs-group | "changepoint" binary segmentation
     anchor_sn: bool = False      # self-normalized DR for the anchor component
     delta_variance: float = 0.025
     delta_bias: float = 0.025
@@ -376,7 +411,7 @@ def combine(comps: list, anchor_comp, cfg: ODriftConfig, lam: float | None = Non
     z_k = norm.ppf(1 - cfg.delta_bias / (2 * len(keep))) if keep else 0.0
     B = bias_bounds(sel, sel_anchor, S_sel, z_k)
     if cfg.selection == "segment":
-        alpha = segment_select(sel, S_sel, cfg.z_group, cfg.z_anchor, cfg.fallback)
+        alpha = segment_select(sel, S_sel, cfg.z_group, cfg.z_anchor, cfg.fallback, cfg.grouping)
     elif cfg.selection == "mse":
         d_sel, C_sel = diff_moments(sel, S_sel)
         alpha = select_weights(S_sel, B, lam, Q=mse_objective(S_sel, d_sel, C_sel, lam))
