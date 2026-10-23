@@ -224,3 +224,11 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    - Bug fix: balanced O-DRIFT reported weights keyed by segment, so per-window weights were
      all 0 and the S7 go/no-go check passed trivially. Now split by record share; test added.
    - Pre-registered: per-env/per-policy breakdowns, bias/sd split, search-budget counts.
+17. **Dev v5 (2026-10-23, full suite incl. forecast/time-aware/composite)**. Tuning picked
+   joint segment models: odrift [1e-4, 5.0, joint]. Ratio vs best tuned baseline per cell:
+   S0 1.03, S1 0.94*, S2 1.02, S3a 0.83*, S3b **1.12 (loss, vs time-aware DR; CI excludes 0)**,
+   S4 0.82* (vs new composite tbdecay[0.9]; env 2 fixed 1.39 -> 0.84). Dev go/no-go passes
+   (S3a, S4). Mean log RMSE across cells: O-DRIFT -4.97, composite -4.79, tdecay -4.69,
+   time-aware DR -4.53 -> no single baseline is competitive everywhere; time-aware DR wins
+   only where drift is exactly linear in time (its own model class) and is 2x worse in S4,
+   coverage 0.69-0.78. Report S3b as a stated loss. Results: results/03_dev.json (v5).

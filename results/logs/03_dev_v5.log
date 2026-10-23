@@ -1,0 +1,7 @@
+S0@0.0     n=200  best: pooled_dr=0.0054  recent_dr[12]=0.0054  balanced_dr=0.0054  slope[3.0]=0.0054  minvar_dr=0.0054  monitor_select_dr=0.0054
+S1@1.0     n=200  best: odrift[0.001,3.0,0]=0.0062  odrift[0.001,3.0,1]=0.0062  odrift[0.001,3.5,0]=0.0062  odrift[0.001,3.5,1]=0.0062  odrift[0.001,4.0,0]=0.0062  odrift[0.001,4.0,1]=0.0062
+S2@0.0     n=200  best: balanced_dr=0.0051  tbdecay[1.0]=0.0052  odrift[0.001,3.0,0]=0.0052  odrift[0.001,3.0,1]=0.0052  odrift[0.001,3.5,0]=0.0052  odrift[0.001,3.5,1]=0.0052
+S3a@0.5    n=200  best: odrift[0.0001,3.5,0]=0.0065  odrift[0.0001,4.0,0]=0.0065  odrift[0.0001,5.0,0]=0.0065  odrift[0.0001,3.5,1]=0.0065  odrift[0.0001,4.0,1]=0.0065  odrift[0.0001,5.0,1]=0.0065
+S3b@0.5    n=200  best: timedr[1]=0.0084  oracle=0.0087  odrift[0.0001,3.5,0]=0.0092  odrift[0.0001,4.0,0]=0.0092  odrift[0.0001,5.0,0]=0.0092  odrift[0.0001,3.0,0]=0.0092
+S4@0.5     n=200  best: odrift[0.0001,5.0,1]=0.0103  odrift[0.0001,4.0,1]=0.0103  odrift[0.0001,3.5,1]=0.0103  ablate_nobalance[0.0001,5.0,1]=0.0103  ablate_nobalance[0.0001,4.0,1]=0.0103  ablate_nobalance[0.0001,3.5,1]=0.0103
+wrote /Users/gauris/dev/o-drift/results/03_dev.json
