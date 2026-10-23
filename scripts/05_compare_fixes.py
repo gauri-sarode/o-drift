@@ -53,6 +53,11 @@ def run_one(args):
                 r = combine(comps, anc, replace(cfg, grouping=gr, z_group=zg, z_anchor=za, fallback=fb))
                 out.setdefault(f"{gr[:2]}:" + name(zg, za, fb, sn), []).append(dict(err=r.value - truths[p_idx], hw=r.half_width,
                                                                   anchor_only=r.weights.get(len(comps), 0) > 0.999))
+                for m in shrink_refs:
+                    r = combine(comps, anc, replace(cfg, grouping=gr, z_group=zg, z_anchor=za, fallback=fb,
+                                                    selection="shrink", shrink_ref=m), 1.0)
+                    out.setdefault(f"shrink{m}:{gr[:2]}:" + name(zg, za, fb, sn), []).append(
+                        dict(err=r.value - truths[p_idx], hw=r.half_width, anchor_only=False))
     return out
 
 
