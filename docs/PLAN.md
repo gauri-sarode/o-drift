@@ -136,3 +136,20 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    reference (targets 1500/3000/4500) did not help (S4 18.7-19.9 vs shrink-6 18.4): the
    reference grows into the old windows and inherits the same problem. Same information
    limit as S3a — b below reference noise. shrink-6 remains the tuning-rule winner.
+9. **Reward-drift monitor (2026-10-23) — the key change.** Detect reward drift on the
+   conditional reward function, not the scalar policy value: pooled per-action
+   quadratic logistic model on all history; per-(window, action) residual means;
+   binary segmentation with a chi-square test over actions (Bonferroni over split
+   points). Detection check (20 episodes/regime): 0% false splits in S0/S1/S2 (context
+   and logger shift do not fool it), 100% exact split in S3a at intensity 0.5 and 0.25.
+   The scalar value test had z ~ 1-2 for the same drift; the per-action test pools
+   evidence across actions whose shifts partially cancel in the policy value.
+   Full dev (monitor α=0.001 + shrinkage, z_a=3): S0 5.8, S1 6.6, S2 6.5, S3a 8.0,
+   S3b 10.9, S4 17.8 → ratio to per-cell best 1.08/1.00/1.07/1.03/1.09/1.33,
+   worst 1.33, mean 1.10 (best baseline: transport 1.29 mean / 1.71 worst).
+   This is the proposal's "mechanism-specific observability" made concrete: reward
+   drift is detected from per-action conversion residuals, then the anchor only
+   arbitrates between already-detected segments.
+10. Context-shift gate: LR test of a source-vs-target logistic classifier; transport
+   only when it rejects (S0/S2 false-reject ~1%; S1 shifts >= ~0.06 sd detected).
+   Motivation: always-on density ratios cost ~8% RMSE in S0/S2.
