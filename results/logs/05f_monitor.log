@@ -1,0 +1,21 @@
+S0@0.0
+S1@1.0
+S2@0.0
+S3a@0.5
+S3b@0.5
+S4@0.5
+
+variant                                          S0@0.0     S1@1.0     S2@0.0    S3a@0.5    S3b@0.5     S4@0.5   meanlog
+mon0.001:shrink:za=3.0,fb=least,sn=0               5.84       6.57       6.46       8.03      10.90      17.79   -4.764
+mon0.001:shrink:za=2.5,fb=least,sn=0               5.84       6.57       6.46       8.82      11.16      17.91   -4.743
+mon0.001:seg:za=3.0,fb=least,sn=0                  5.84       6.57       6.46       8.23      11.28      19.29   -4.740
+mon0.01:shrink:za=3.0,fb=least,sn=0                5.85       6.58       6.56       8.01      11.32      19.58   -4.739
+mon0.001:seg:za=2.5,fb=least,sn=0                  5.84       6.57       6.46       9.02      11.54      19.40   -4.720
+mon0.01:shrink:za=2.5,fb=least,sn=0                5.85       6.58       6.56       8.81      11.57      19.65   -4.719
+mon0.01:seg:za=3.0,fb=least,sn=0                   5.89       6.58       6.62       8.22      12.06      21.60   -4.705
+mon0.01:seg:za=2.5,fb=least,sn=0                   5.89       6.58       6.62       9.02      12.32      21.66   -4.686
+shrink6:ch:zg=3.5,za=2.5,fb=least,sn=0             7.70       8.05       8.21       7.90      10.38      18.43   -4.649
+shrink6:ch:zg=3.5,za=3.0,fb=least,sn=0             7.70       8.05       8.21       7.90      10.38      18.43   -4.649
+ch:zg=3.5,za=3.0,fb=least,sn=0                     6.23       7.15       6.94      10.87      13.40      19.99   -4.623
+ch:zg=3.5,za=2.5,fb=least,sn=0                     6.23       7.15       7.00      11.40      13.40      19.99   -4.613
+(RMSE x1e3; fraction of anchor-only outputs stored in results/05_compare_fixes.json)

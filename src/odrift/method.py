@@ -85,6 +85,20 @@ def diagnose(data: LoggedData, pi_probs: np.ndarray, n_actions: int, weights: np
 
 # ---------------------------------------------------------- density ratios
 
+def context_shift_pvalue(X_src: np.ndarray, X_tgt: np.ndarray) -> float:
+    """Likelihood-ratio test of a logistic source-vs-target classifier against
+    the intercept-only model (chi-square, d dof). Small p = detectable context shift."""
+    from scipy.stats import chi2
+    X = np.vstack([X_src, X_tgt])
+    y = np.r_[np.zeros(len(X_src)), np.ones(len(X_tgt))]
+    clf = LogisticRegression(C=1e6, max_iter=1000).fit(X, y)
+    p = np.clip(clf.predict_proba(X)[:, 1], 1e-12, 1 - 1e-12)
+    ll = (y * np.log(p) + (1 - y) * np.log(1 - p)).sum()
+    p0 = y.mean()
+    ll0 = (y * np.log(p0) + (1 - y) * np.log(1 - p0)).sum()
+    return float(chi2.sf(2 * (ll - ll0), X.shape[1]))
+
+
 def context_ratio(X_src: np.ndarray, X_tgt: np.ndarray, n_folds: int = 2, seed: int = 0) -> np.ndarray:
     """Cross-fitted w(x) = p_T(x)/p_k(x) on the source contexts, normalized to mean 1.
 
@@ -128,9 +142,13 @@ class Nuisances:
 
 
 def fit_nuisances(data: LoggedData, X_target: np.ndarray, n_actions: int,
-                  same_distribution: bool = False, seed: int = 0) -> Nuisances:
+                  same_distribution: bool = False, seed: int = 0, context_alpha: float = 0.0) -> Nuisances:
+    """context_alpha > 0: transport only if the context-shift test rejects at that level."""
     q_src, q_tgt = crossfit_rewards(data, n_actions, seed=seed, extra_X=X_target)
-    w = np.ones(len(data)) if same_distribution else context_ratio(data.X, X_target, seed=seed)
+    if same_distribution or (context_alpha > 0 and context_shift_pvalue(data.X, X_target) >= context_alpha):
+        w = np.ones(len(data))
+    else:
+        w = context_ratio(data.X, X_target, seed=seed)
     return Nuisances(q_src, q_tgt, w)
 
 
@@ -368,6 +386,7 @@ class ODriftConfig:
     grouping: str = "greedy"     # "greedy" window-vs-group | "changepoint" binary segmentation
     shrink_ref: int = 0          # "shrink": 0 = segment reference; m > 0 = newest m windows + anchor
     shrink_ess: float = 0.0      # "shrink": > 0 = newest windows until cumulative ESS >= this (overrides m)
+    context_alpha: float = 0.0   # > 0: density-ratio transport only for windows whose context-shift test rejects
     anchor_sn: bool = False      # self-normalized DR for the anchor component
     delta_variance: float = 0.025
     delta_bias: float = 0.025
@@ -399,7 +418,8 @@ class ODriftResult:
 def fit_all_nuisances(history: list, anchor: LoggedData, X_target: np.ndarray, n_actions: int,
                       cfg: ODriftConfig, seed: int = 0) -> tuple:
     """Policy-independent nuisances for every window and the anchor (or None)."""
-    hist = [fit_nuisances(d, X_target, n_actions, seed=seed + k) for k, d in enumerate(history)]
+    hist = [fit_nuisances(d, X_target, n_actions, seed=seed + k, context_alpha=cfg.context_alpha)
+            for k, d in enumerate(history)]
     anc = (fit_nuisances(anchor, X_target, n_actions, same_distribution=True, seed=seed + 999)
            if len(anchor) >= cfg.min_anchor else None)
     return hist, anc
