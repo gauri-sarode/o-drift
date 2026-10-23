@@ -139,6 +139,19 @@ class Nuisances:
     q_src: np.ndarray   # out-of-fold q_hat on the window's own contexts, (n, A)
     q_tgt: np.ndarray   # fold-averaged q_hat on target contexts, (M, A)
     w: np.ndarray       # context ratio p_T/p_k on the window's contexts, (n,)
+    w_fn: object = None  # X -> p_T/p_k at arbitrary contexts (None = no detected shift, ratio 1)
+
+
+def ratio_function(X_src: np.ndarray, X_tgt: np.ndarray):
+    """Full-data probabilistic-classification estimate of x -> p_T(x)/p_k(x),
+    normalized to mean 1 over the source sample (used to evaluate one window's
+    ratio at other windows' records for balanced pooling)."""
+    X = np.vstack([X_src, X_tgt])
+    y = np.r_[np.zeros(len(X_src)), np.ones(len(X_tgt))]
+    clf = LogisticRegression(max_iter=1000).fit(X, y)
+    scale = len(X_src) / len(X_tgt)
+    norm_ = np.exp(clf.decision_function(X_src)).mean() * scale
+    return lambda Z: np.exp(clf.decision_function(Z)) * scale / norm_
 
 
 def fit_nuisances(data: LoggedData, X_target: np.ndarray, n_actions: int,
@@ -387,6 +400,7 @@ class ODriftConfig:
     shrink_ref: int = 0          # "shrink": 0 = segment reference; m > 0 = newest m windows + anchor
     shrink_ess: float = 0.0      # "shrink": > 0 = newest windows until cumulative ESS >= this (overrides m)
     context_alpha: float = 0.0   # > 0: density-ratio transport only for windows whose context-shift test rejects
+    balanced: bool = False       # pool each reward segment with balanced (mixture) propensities
     anchor_sn: bool = False      # self-normalized DR for the anchor component
     delta_variance: float = 0.025
     delta_bias: float = 0.025
@@ -437,7 +451,7 @@ def fit_all_nuisances(history: list, anchor: LoggedData, X_target: np.ndarray, n
                 d, m = history[k], pooled.window == k
                 shift = cfg.context_alpha <= 0 or context_shift_pvalue(d.X, X_target) < cfg.context_alpha
                 w = context_ratio(d.X, X_target, seed=seed + k) if shift else np.ones(len(d))
-                hist[k] = Nuisances(q_src[m], q_tgt, w)
+                hist[k] = Nuisances(q_src[m], q_tgt, w, ratio_function(d.X, X_target) if shift else None)
     anc = (fit_nuisances(anchor, X_target, n_actions, same_distribution=True, seed=seed + 999)
            if len(anchor) >= cfg.min_anchor else None)
     return hist, anc
@@ -685,3 +699,68 @@ def heterogeneity_se(res: ODriftResult, comps: list, anc: Component) -> float:
     S = S.copy()
     S[:h, :h] += tau2 * np.eye(h)
     return float(np.sqrt(max(alpha @ S @ alpha, 0.0)))
+
+
+def balanced_segment_components(history: list, anchor: LoggedData, X_target: np.ndarray, pi, n_actions: int,
+                                cfg: ODriftConfig, nuisances: tuple, segments: list, logger_fns: list,
+                                reference_segment: list | None, window_comps: list) -> tuple:
+    """One component per reward-homogeneous segment, pooling its eligible windows with
+    balanced weights (logger drift -> balancing; Agarwal et al. 2017, Kallus et al. 2021):
+
+        W_i = pi(a_i|x_i) / sum_k (n_k/N) mu_k(a_i|x_i) / w_k(x_i),
+
+    the exact importance weight from the target to the segment's pooled sampling
+    distribution sum_k (n_k/N) p_k(x) mu_k(a|x), with p_k = p_T / w_k. logger_fns[k](X)
+    returns window k's event-time logger probabilities (assumption A4). Segments other
+    than the reference are drift-corrected: reference model's DM term + their own
+    residual correction against their own segment model.
+    """
+    hist_nuis, anc_nuis = nuisances
+    eligible = {c.index for c in window_comps if c.diagnostics.eligible}
+    z_diag = norm.ppf(1 - cfg.delta_diagnostics / (2 * (len(history) + 1)))
+    pi_t = pi.probs(X_target)
+    ref = reference_segment if reference_segment is not None else segments[0]
+    dm_ref = (pi_t * hist_nuis[ref[0]].q_tgt).sum(axis=1)
+    comps = []
+    for j, seg in enumerate(segments):
+        ks = [k for k in seg if k in eligible]
+        if not ks:
+            continue
+        data = LoggedData.concat([history[k] for k in ks])
+        q_src = np.concatenate([hist_nuis[k].q_src for k in ks])
+        N = len(data)
+        denom = np.zeros(N)
+        for k in ks:
+            mu_k = logger_fns[k](data.X)[np.arange(N), data.A]
+            w_k = hist_nuis[k].w_fn(data.X) if hist_nuis[k].w_fn is not None else 1.0
+            denom += len(history[k]) / N * mu_k / w_k
+        p_src = pi.probs(data.X)
+        W = p_src[np.arange(N), data.A] / denom
+        corr = W * (data.R - q_src[np.arange(N), data.A])
+        dm = dm_ref if (reference_segment is not None and seg is not ref) else (pi_t * hist_nuis[ks[0]].q_tgt).sum(axis=1)
+        diag = diagnose(data, p_src, n_actions, np.ones(N), z_diag, cfg.min_ess)
+        diag.reasons = [r for r in diag.reasons if r != "propensity_inconsistent"]  # mixture data: checked per window
+        diag.ess = effective_sample_size(W)
+        comps.append(Component(1000 + j, float(dm.mean() + corr.mean()), dm, corr, diag))
+    anc = None
+    if anc_nuis is not None:
+        anc = next(c for c in [transported_dr(anchor, X_target, pi, n_actions, len(history), z_diag, cfg.min_ess,
+                                              same_distribution=True, nuis=anc_nuis)])
+    return comps, anc
+
+
+def odrift_balanced(history: list, anchor: LoggedData, X_target: np.ndarray, pi, n_actions: int,
+                    cfg: ODriftConfig, nuisances: tuple, segments: list, logger_fns: list) -> ODriftResult:
+    """O-DRIFT with balanced within-segment pooling + drift-corrected reuse across segments."""
+    comps, anc = build_components(history, anchor, X_target, pi, n_actions, cfg, nuisances=nuisances)
+    if anc is None:
+        return combine(comps, None, cfg)
+    ref_segment = choose_reference(comps, anc, cfg, segments)
+    seg_comps, anc_c = balanced_segment_components(history, anchor, X_target, pi, n_actions, cfg, nuisances,
+                                                   segments, logger_fns, ref_segment, comps)
+    if ref_segment is None or not seg_comps:
+        return combine(comps, anc, cfg, window_groups=segments)
+    res = combine(seg_comps, anc_c, replace(cfg, **POOL))
+    res.se_hetero = heterogeneity_se(res, seg_comps, anc_c)
+    res.reasons.update({c.index: c.diagnostics.reasons for c in comps if not c.diagnostics.eligible})
+    return res

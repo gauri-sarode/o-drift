@@ -23,7 +23,8 @@ import yaml
 
 from odrift import baselines as bl
 from odrift.method import (ODriftConfig, build_components, combine, covariance, fit_all_nuisances,
-                           make_corrected_split, odrift_corrected, odrift_corrected_split, select_weights)
+                           make_corrected_split, odrift_balanced, odrift_corrected, odrift_corrected_split,
+                           select_weights)
 from odrift.monitor import ResidualStats, reward_changepoints
 from odrift.nuisance import RewardModel, crossfit_rewards
 from odrift.regimes import REGIMES
@@ -102,6 +103,9 @@ def run_one(args):
     if has_anchor:
         datasets["monitor_seg"] = LoggedData.concat([ep.history[k] for k in sorted(segments[m0][0])] + [ep.anchor])
     q_cache = {k: crossfit_rewards(d, A, seed=data_seed)[0] for k, d in datasets.items()}
+    artifacts = [sp if sp.recorded_logger_id is None else replace(sp, logger_id=sp.recorded_logger_id)
+                 for sp in regime.windows]
+    logger_fns = [lambda X, a=a: mu(env, a, X) for a in artifacts]
     # multi-logger balanced propensities from event-time logger artifacts (A4); in S6 the
     # artifact for the faulty windows is the wrongly recorded logger, as in the logs
     if has_anchor:
@@ -131,8 +135,8 @@ def run_one(args):
         put("pooled_dr", e.value, Z95 * e.se)
         if not has_anchor:
             m, za = grid["odrift"][0]
-            r = odrift_corrected(ep.history, ep.anchor, ep.target_contexts, pi, A, replace(CFG, z_anchor=za),
-                                 seg_nuis[m], segments[m])
+            r = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, pi, A, replace(CFG, z_anchor=za),
+                                seg_nuis[m], segments[m], logger_fns)
             put("odrift", r.value, r.half_width, status=r.status)
             continue
         e = dr_on("anchor")
@@ -190,6 +194,9 @@ def run_one(args):
         for m, za in grid["odrift"]:
             r = odrift_corrected(ep.history, ep.anchor, ep.target_contexts, pi, A, replace(CFG, z_anchor=za),
                                  seg_nuis[m], segments[m])
+            put(f"ablate_nobalance[{m},{za}]", r.value, Z95 * (r.se_hetero or r.se))
+            r = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, pi, A, replace(CFG, z_anchor=za),
+                                seg_nuis[m], segments[m], logger_fns)
             deficient = [k for k, reasons in r.reasons.items() if "target_support" in reasons]
             hw_re = Z95 * (r.se_hetero if r.se_hetero is not None else r.se)
             put(f"odrift[{m},{za}]", r.value, hw_re, hw_narrow=float(Z95 * r.se), hw_certified_bound=float(r.half_width),
