@@ -204,3 +204,23 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    drifted cell. Hetero interval coverage 0.95/0.96/0.95/0.92/0.74/0.86. Dev go/no-go:
    >=2 reward-drift cells at <=0.9x (S3a, S4) and S0-S2 <=1.1x -> passes on dev.
    S3b is 0.92 (not <=0.9). Results: results/03_dev.json, log results/logs/03_dev_v4.log.
+16. **Pre-freeze review (2026-10-23)**. Per-env/per-policy breakdown of dev v4 showed S4's
+   0.85 hid a loss in env 2 (1.39 vs MinVar) and losses for near-optimal policies in S4/S3b.
+   Diagnosis (scratch diag_s4): the drift-corrected OLD segment carries -20..-30e-3 bias in
+   env 2 = error in the estimated drift q_ref - q_old, because two separately fit, misspecified
+   models are fit on different context distributions (old third vs the context-shifted middle
+   third) and their misfits do not cancel. Candidate fix: one joint model (shared per-action
+   linear base + per-segment linear offsets). Dev prototype (100 eps/cell, scripts/06):
+   S4 11.20 -> 10.16 (env 2 12.8 -> 11.6), S3a +0.6%, S3b +3%, S0-S2 identical. Not
+   hand-adopted: added as odrift_grid.joint_segments [false, true]; the frozen tuning rule
+   decides, the other is an ablation.
+   Additions in the same pass, all registered before any run of them:
+   - baselines: forecast (Chandak et al. 2020, GLS polynomial in window time), time-aware DR
+     (reward model x polynomial time), transport+balanced+decay composite. Smoke: composite
+     within 4% of O-DRIFT in S4, time-aware DR = recent-6 in S3b; forecast weak (variance).
+   - S8 misspecified (out-of-class) reward drift: test split [0.5, 1.0]; dev run diagnostic
+     only, never tuned on; reported as robustness, not a go/no-go cell. Existing env draws
+     verified bit-identical (new param drawn last).
+   - Bug fix: balanced O-DRIFT reported weights keyed by segment, so per-window weights were
+     all 0 and the S7 go/no-go check passed trivially. Now split by record share; test added.
+   - Pre-registered: per-env/per-policy breakdowns, bias/sd split, search-budget counts.
