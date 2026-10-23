@@ -405,6 +405,8 @@ class ODriftConfig:
     joint_segments: bool = False  # segment reward models: one joint fit (shared base + per-segment offsets)
     segment_trend: str = ""       # joint fit only: "" none | "segment" per-segment slope | "shared" one
                                   # within-segment slope common to all segments; evaluated at the target time
+    model_anchor: bool = False    # joint fit only: anchor records join the newest segment at t = 1, so the
+                                  # target-time prediction is interpolated, not extrapolated
     anchor_sn: bool = False      # self-normalized DR for the anchor component
     delta_variance: float = 0.025
     delta_bias: float = 0.025
@@ -444,7 +446,8 @@ def fit_all_nuisances(history: list, anchor: LoggedData, X_target: np.ndarray, n
     q -- instead of one model per window. Context ratios stay per window.
     """
     if segments is not None and cfg.joint_segments:
-        hist = _joint_segment_nuisances(history, X_target, n_actions, cfg, seed, segments)
+        hist = _joint_segment_nuisances(history, X_target, n_actions, cfg, seed, segments,
+                                        anchor if cfg.model_anchor and len(anchor) else None)
     elif segments is None:
         hist = [fit_nuisances(d, X_target, n_actions, seed=seed + k, context_alpha=cfg.context_alpha)
                 for k, d in enumerate(history)]
@@ -464,7 +467,7 @@ def fit_all_nuisances(history: list, anchor: LoggedData, X_target: np.ndarray, n
 
 
 def _joint_segment_nuisances(history: list, X_target: np.ndarray, n_actions: int, cfg: ODriftConfig,
-                             seed: int, segments: list) -> list:
+                             seed: int, segments: list, anchor: LoggedData | None = None) -> list:
     """One cross-fitted logistic model on all history: shared per-action linear base plus
     a per-segment linear offset (segments[0], the newest, is the baseline). Segment models
     then share the base's misspecification error, so the drift estimate q_ref - q_old used
@@ -473,7 +476,9 @@ def _joint_segment_nuisances(history: list, X_target: np.ndarray, n_actions: int
     from sklearn.linear_model import LogisticRegression
     from .nuisance import _features
     seg_of = {k: j for j, seg in enumerate(segments) for k in seg}
-    pooled = LoggedData.concat(history)
+    if anchor is not None:  # anchor (window index K) is fit as part of the newest segment
+        seg_of[len(history)] = 0
+    pooled = LoggedData.concat(history + ([anchor] if anchor is not None else []))
     sid = np.array([seg_of[k] for k in pooled.window])
     J, M = len(segments), len(X_target)
 

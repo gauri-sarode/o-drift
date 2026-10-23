@@ -26,8 +26,8 @@ CFG = ODriftConfig(delta_variance=TUNE["delta_split"]["variance"], delta_bias=TU
                    **TUNE["odrift_fixed"], z_anchor=TUNED[1])
 
 
-VARIANTS = (("separate", False, ""), ("joint", True, ""), ("joint_trend", True, "segment"),
-            ("joint_shared_trend", True, "shared"))
+VARIANTS = (("joint", True, "", False), ("joint_anchor", True, "", True),
+            ("joint_anchor_shared_trend", True, "shared", True), ("joint_anchor_trend", True, "segment", True))
 
 
 def truths(regime_name, intensity, e):
@@ -46,8 +46,8 @@ def run_one(args):
     fns = [lambda X, a=(sp if sp.recorded_logger_id is None else replace(sp, logger_id=sp.recorded_logger_id)):
            mu(env, a, X) for sp in reg.windows]
     out = {}
-    for name, joint, trend in VARIANTS:
-        cfg = replace(CFG, joint_segments=joint, segment_trend=trend)
+    for name, joint, trend, anc in VARIANTS:
+        cfg = replace(CFG, joint_segments=joint, segment_trend=trend, model_anchor=anc)
         nuis = fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, env.n_actions, cfg, seed, segments=segs)
         out[name] = [odrift_balanced(ep.history, ep.anchor, ep.target_contexts, Policy.near_optimal(env, noise=s, seed=e),
                                      env.n_actions, cfg, nuis, segs, fns).value - v for s, v in zip(TUNE["candidate_policies"], vt)]
@@ -69,7 +69,7 @@ def main():
             out = list(pool.map(run_one, jobs))
             env = np.array([j[2] for j in jobs])
             res[cell] = {}
-            for v in [n for n, _, _ in VARIANTS]:
+            for v in [n for n, *_ in VARIANTS]:
                 err = np.array([o[v] for o in out])
                 res[cell][v] = dict(rmse=float(np.sqrt((err ** 2).mean())), bias=float(err.mean()),
                                     errs=err.tolist(), rmse_env=[float(np.sqrt((err[env == e] ** 2).mean())) for e in DEV["env_seeds"]])

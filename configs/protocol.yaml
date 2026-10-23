@@ -44,7 +44,7 @@ splits:
       S8: [0.5, 1.0]                          # misspecified (out-of-class) reward drift; added 2026-10-23
                                               # before freeze; dev S8 runs are diagnostic only, never tuned on
       S8b: [1.0]                              # S8 without the in-class intercept: pure out-of-class drift,
-                                              # stress test only (added 2026-10-24 at freeze, never run on dev)
+                                              # stress test only (added 2026-10-24); dev S8b@0.5 diagnostic only, never tuned on
   real:
     dataset: open_bandit  # semi-synthetic temporal interventions only; never claimed as natural drift
 
