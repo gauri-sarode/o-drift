@@ -193,3 +193,14 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    relabelled as an ablation. The FROZEN go/no-go coverage criterion (split coverage
    >= 0.93) is kept unchanged and reported as-is, with the explicit note that it passes
    only because the split bound is vacuous.
+15. **Strong-baseline suite + balanced within-segment pooling (2026-10-23)**. Added SLOPE,
+   MAGIC, anchor-validated selection, transport+recent/decay, multi-logger balanced DR,
+   monitor-informed selection, oracle-tuned recent/decay. Balanced DR beat O-DRIFT in S2
+   (ratio 1.20) -> O-DRIFT now pools windows within a monitor segment with mixture
+   propensities (per-window version kept as `ablate_nobalance`). Full dev run v4
+   (200 policy-episodes/cell, tuned odrift [1e-4, 5.0]), O-DRIFT vs best tuned baseline:
+   S0 1.03 (CI incl. 0), S1 0.94*, S2 1.02 vs balanced_dr (CI incl. 0), S3a 0.83*,
+   S3b 0.92*, S4 0.85* (*paired CI excludes 0). Beats oracle-tuned recent/decay in every
+   drifted cell. Hetero interval coverage 0.95/0.96/0.95/0.92/0.74/0.86. Dev go/no-go:
+   >=2 reward-drift cells at <=0.9x (S3a, S4) and S0-S2 <=1.1x -> passes on dev.
+   S3b is 0.92 (not <=0.9). Results: results/03_dev.json, log results/logs/03_dev_v4.log.
