@@ -150,7 +150,12 @@ class LoggedData:
 
 def log_window(env: EnvParams, spec: WindowSpec, n: int, window: int,
                rng: np.random.Generator) -> LoggedData:
-    X = sample_contexts(env, spec, n, rng)
+    return log_contexts(env, spec, sample_contexts(env, spec, n, rng), window, rng)
+
+
+def log_contexts(env, spec: WindowSpec, X: np.ndarray, window: int, rng: np.random.Generator) -> LoggedData:
+    """Log given contexts: A ~ mu_spec(.|X), R ~ Bernoulli(q_spec(X, A)) (shared with the OBD env)."""
+    n = len(X)
     probs = mu(env, spec, X)
     # inverse-CDF sampling of one action per row
     A = (probs.cumsum(axis=1) < rng.random((n, 1))).sum(axis=1)

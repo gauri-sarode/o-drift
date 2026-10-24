@@ -22,6 +22,7 @@ import numpy as np
 import yaml
 
 from odrift import baselines as bl
+from odrift import obd
 from odrift.method import (ODriftConfig, build_components, combine, covariance, fit_all_nuisances,
                            make_corrected_split, odrift_balanced, ratio_function, odrift_corrected, odrift_corrected_split,
                            select_weights)
@@ -38,19 +39,30 @@ CFG = ODriftConfig(delta_variance=TUNE["delta_split"]["variance"], delta_bias=TU
 Z95 = 1.959964
 
 
-def make_env(seed):
+def make_env(seed, dataset="sim"):
+    if dataset == "obd":
+        return obd.OBDEnv.sample(seed)
     return EnvParams.sample(seed, d=SIM["d"], n_actions=SIM["n_actions"], misspec=SIM["misspec"])
 
 
+def make_episode(env, regime, n_anchor, seed, dataset="sim"):
+    sampler = obd.sample_episode if dataset == "obd" else sample_episode
+    return sampler(env, regime, SIM["n_per_window"], n_anchor, SIM["n_target_contexts"], seed=seed)
+
+
 def policies(env, env_seed):
-    return [Policy.near_optimal(env, noise=s, seed=env_seed) for s in TUNE["candidate_policies"]]
+    noises = PROTOCOL["splits"]["real"]["candidate_policies"] if isinstance(env, obd.OBDEnv) else TUNE["candidate_policies"]
+    return [Policy.near_optimal(env, noise=s, seed=env_seed) for s in noises]
 
 
-def truths_for(regime_name, intensity, env_seed):
-    env = make_env(env_seed)
+def truths_for(regime_name, intensity, env_seed, dataset="sim"):
+    env = make_env(env_seed, dataset)
     regime = REGIMES[regime_name](intensity, K=SIM["n_windows"])
     out = []
     for pi in policies(env, env_seed):
+        if dataset == "obd":  # exact over all real target-block contexts
+            out.append((obd.true_value(env, pi, regime.target), [obd.true_value(env, pi, w) for w in regime.windows]))
+            continue
         v_t = true_value(env, pi, regime.target, regime.target, n_mc=SIM["n_mc_truth"])
         v_k = [true_value(env, pi, regime.target, w, n_mc=SIM["n_mc_truth"]) for w in regime.windows]
         out.append((v_t, v_k))
@@ -81,11 +93,11 @@ def method_grid(split, tuned):
 
 
 def run_one(args):
-    regime_name, intensity, env_seed, data_seed, n_anchor, truths, grid = args
-    env = make_env(env_seed)
+    regime_name, intensity, env_seed, data_seed, n_anchor, truths, grid, dataset = args
+    env = make_env(env_seed, dataset)
     regime = REGIMES[regime_name](intensity, K=SIM["n_windows"])
     pis = policies(env, env_seed)
-    ep = sample_episode(env, regime, SIM["n_per_window"], n_anchor, SIM["n_target_contexts"], seed=data_seed)
+    ep = make_episode(env, regime, n_anchor, data_seed, dataset)
     K, A = regime.n_windows, env.n_actions
     has_anchor = n_anchor >= CFG.min_anchor
 
@@ -269,18 +281,19 @@ def liu_with_model(r_hat, anchor, X_target, pi, A):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--split", choices=["dev", "test"], required=True)
+    ap.add_argument("--split", choices=["dev", "test", "obd"], required=True)
     ap.add_argument("--reps", type=int, default=None, help="data seeds per env seed")
     ap.add_argument("--cells", nargs="*", default=None)
     ap.add_argument("--n-anchor", type=int, default=SIM["n_anchor_default"])
     ap.add_argument("--out", default=None, help="output path (default results/03_{split}[_anchorN].json)")
     args = ap.parse_args()
-    split = PROTOCOL["splits"][args.split]
+    dataset = "obd" if args.split == "obd" else "sim"
+    split = PROTOCOL["splits"]["real" if dataset == "obd" else args.split]
     tuned = None
-    if args.split == "test":
+    if args.split in ("test", "obd"):  # frozen config only; OBD is never tuned on
         assert PROTOCOL["status"] == "FROZEN", "protocol must be frozen before touching test"
         tuned = json.loads((ROOT / "results/tuned.json").read_text())
-    grid = method_grid(args.split, tuned)
+    grid = method_grid("test" if dataset == "obd" else args.split, tuned)
     cells = [(r, i) for r, ints in split["regimes"].items() for i in ints]
     if args.cells:
         cells = [(c.split("@")[0], float(c.split("@")[1])) for c in args.cells]
@@ -292,9 +305,9 @@ def main():
     with ProcessPoolExecutor() as pool:
         for regime_name, intensity in cells:
             n_env = len(split["env_seeds"])
-            truth = dict(zip(split["env_seeds"], pool.map(truths_for, [regime_name] * n_env,
-                                                           [intensity] * n_env, split["env_seeds"])))
-            jobs = [(regime_name, intensity, e, start + s, args.n_anchor, truth[e], grid)
+            truth = dict(zip(split["env_seeds"], pool.map(truths_for, [regime_name] * n_env, [intensity] * n_env,
+                                                           split["env_seeds"], [dataset] * n_env)))
+            jobs = [(regime_name, intensity, e, start + s, args.n_anchor, truth[e], grid, dataset)
                     for e in split["env_seeds"] for s in range(reps)]
             results = list(pool.map(run_one, jobs))
             key = f"{regime_name}@{intensity}"

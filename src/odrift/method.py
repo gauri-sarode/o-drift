@@ -495,19 +495,34 @@ def _joint_segment_nuisances(history: list, X_target: np.ndarray, n_actions: int
             raise ValueError(cfg.segment_trend)
         return np.hstack(cols)
 
+    from scipy.special import expit
+    from .nuisance import block_logits
+    P = n_actions * (1 + X_target.shape[1])  # coefficients per feature block (same layout as _features)
+
+    def logits(coef, X, s_ids, t):
+        """All-action logits of the fitted joint model, block by block (no feature materialization)."""
+        blk = [coef[i * P:(i + 1) * P] for i in range(len(coef) // P)]
+        L = block_logits(X, blk[0], n_actions)
+        for j in range(1, J):
+            L = L + (s_ids == j)[:, None] * block_logits(X, blk[j], n_actions)
+        if cfg.segment_trend == "segment":
+            for j in range(J):
+                L = L + ((s_ids == j) * t)[:, None] * block_logits(X, blk[J + j], n_actions)
+        elif cfg.segment_trend == "shared":
+            L = L + t[:, None] * block_logits(X, blk[J], n_actions)
+        return L
+
     folds = np.random.default_rng(seed).permutation(len(pooled)) % 2
     q_src = np.empty((len(pooled), n_actions))
     q_tgt = np.zeros((J, M, n_actions))
-    Xr, Ar = np.tile(X_target, (n_actions, 1)), np.repeat(np.arange(n_actions), M)
     for f in range(2):
         tr = folds != f
         model = LogisticRegression(C=1.0, max_iter=3000, fit_intercept=False)
         model.fit(feats(pooled.X[tr], pooled.A[tr], sid[tr], t_all[tr]), pooled.R[tr])
-        te = np.where(~tr)[0]
-        for a in range(n_actions):
-            q_src[te, a] = model.predict_proba(feats(pooled.X[te], np.full(len(te), a), sid[te], t_all[te]))[:, 1]
+        coef, te = model.coef_.ravel(), np.where(~tr)[0]
+        q_src[te] = expit(logits(coef, pooled.X[te], sid[te], t_all[te]))
         for j in range(J):
-            q_tgt[j] += model.predict_proba(feats(Xr, Ar, np.full(len(Ar), j), np.ones(len(Ar))))[:, 1].reshape(n_actions, M).T / 2
+            q_tgt[j] += expit(logits(coef, X_target, np.full(M, j), np.ones(M))) / 2
     hist = []
     for k, d in enumerate(history):
         shift = cfg.context_alpha <= 0 or context_shift_pvalue(d.X, X_target) < cfg.context_alpha

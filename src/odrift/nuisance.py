@@ -1,6 +1,7 @@
 """Cross-fitted reward models q_hat(x, a)."""
 
 import numpy as np
+from scipy.special import expit
 from sklearn.linear_model import LogisticRegression
 
 from .simulator import LoggedData
@@ -10,6 +11,12 @@ def _features(X: np.ndarray, A: np.ndarray, n_actions: int) -> np.ndarray:
     """Per-action linear features: [onehot(a), x * onehot(a)]."""
     onehot = np.eye(n_actions)[A]
     return np.hstack([onehot, (X[:, :, None] * onehot[:, None, :]).reshape(len(A), -1)])
+
+
+def block_logits(X: np.ndarray, coef: np.ndarray, n_actions: int) -> np.ndarray:
+    """Logits for every action from coefficients laid out as _features: [b (A), W (d*A, x-major)].
+    Equal to scoring _features(x, a) for each a, without materializing the (n*A, A(1+d)) matrix."""
+    return X @ coef[n_actions:].reshape(X.shape[1], n_actions) + coef[:n_actions]
 
 
 class RewardModel:
@@ -32,9 +39,7 @@ class RewardModel:
         n = len(X)
         if self._constant is not None:
             return np.full((n, self.n_actions), self._constant)
-        A = np.repeat(np.arange(self.n_actions), n)
-        Xr = np.tile(X, (self.n_actions, 1))
-        return self.model.predict_proba(_features(Xr, A, self.n_actions))[:, 1].reshape(self.n_actions, n).T
+        return expit(block_logits(X, self.model.coef_.ravel(), self.n_actions))
 
 
 def crossfit_rewards(data: LoggedData, n_actions: int, n_folds: int = 2, seed: int = 0,

@@ -290,3 +290,15 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    is then centered near that unlucky anchor (selection effect). Not run on test. Paper:
    information-limit paragraph -- with n_anchor = 1000 the anchor cannot validate the history
    at the bias scale that matters; detecting a 4e-3 bias needs ~10^5-10^6 anchor records.
+23. **Open Bandit semi-synthetic setup (2026-10-24; design pre-registered in protocol splits.real
+   before any OBD result)**. scripts/07_prepare_obd.py -> data/obd_men.npz (gitignored; OBD is
+   CC BY 4.0, cite Saito et al.); src/odrift/obd.py; 03_evaluate --split obd (frozen tuned.json,
+   no tuning on OBD). Two pre-result amendments, both recorded in the protocol:
+   (a) base reward: raw x^2 of heavy-tailed one-hot PCs overfit (logit sd ~6); now standardized
+       x^2 + CV-chosen L2 (C=1) -> logit sd 0.60, per-user CTR 1-21%, nonlinear share 0.40.
+   (b) candidate policies [0, .1, .2, .3]: simulator noise levels at 34 actions give ESS/n
+       0.007-0.02 (no overlap; a 4-episode smoke had every method off by more than the value);
+       chosen by an overlap-only rule (noisiest ESS/n 0.07 = simulator's 0.068).
+   Engineering (behaviour-preserving, verified max diff 3e-16 vs old code, tests pass):
+   per-action logistic predictions computed from coefficients instead of materializing the
+   (n*A, A(1+d)) feature matrix -> OBD episode 374 s -> 88 s.

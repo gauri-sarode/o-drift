@@ -68,6 +68,9 @@ splits:
     data_seeds: {start: 20000, count: 50}  # per env seed: resampled contexts per block + actions + rewards
     sizes: {n_per_window: 5000, n_anchor: 1000, n_target_contexts: 10000}  # anchor/target disjoint, from block 12
     truth: exact average over ALL block-12 contexts of sum_a pi(a|x) q_T(x, a)
+    candidate_policies: [0.0, 0.1, 0.2, 0.3]  # amendment 2026-10-24 before any OBD estimate was looked at
+      # beyond a 4-episode smoke: simulator noise levels give ESS/n 0.007-0.02 at 34 actions (no overlap);
+      # chosen so the noisiest policy's ESS/n (0.07) matches the simulator's noisiest (0.068); overlap-only rule
     report: same tables/breakdowns as test; descriptive only (no go/no-go)
 
 tuning:  # dev split only
