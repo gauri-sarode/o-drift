@@ -257,3 +257,10 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    S8b@0.5 dev diagnostic (results/03_dev_S8b_diagnostic.json): O-DRIFT 7.07 vs best
    (tbdecay) 6.83, ratio 1.04, CI [-0.31, +0.80]e-3; monitor splits 177/200; drift is weak
    at value level (pooled bias +0.3) -> inconclusive as a stress test; test S8b@1.0 decides.
+20. **METHOD FREEZE (2026-10-24, user confirmed)**. Final: O-DRIFT [monitor alpha 1e-4,
+   z_anchor 5.0, joint segment models], balanced within-segment pooling, drift-corrected
+   reuse, hetero interval; all baselines at results/tuned.json. Test split (15 cells incl.
+   S5/S6/S7/S8/S8b) + no-anchor run executed once from this commit. Pre-launch smoke
+   checks on DEV seeds only (S5@0.5, S6@0.0, S8b@1.0 x 4 episodes, no-anchor S0) confirmed
+   the pipeline runs; their outputs were deleted unanalysed (S8b@1.0 is a test intensity
+   but those were dev-seed episodes; no test data touched).

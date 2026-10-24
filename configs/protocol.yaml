@@ -4,7 +4,9 @@
 # Test splits are run once per frozen configuration and reported as-is.
 
 status: FROZEN  # user confirmed go/no-go thresholds 2026-10-22
-freeze_date: 2026-10-22
+freeze_date: 2026-10-22  # thresholds
+method_freeze_date: 2026-10-24  # method, grids, baselines, regimes, tuned.json final (user confirmed)
+method_freeze_commit_note: test split run once from this commit; tuned settings in results/tuned.json
 
 simulator:
   d: 5
