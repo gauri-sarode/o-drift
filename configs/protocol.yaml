@@ -51,6 +51,24 @@ splits:
                                               # stress test only (added 2026-10-24); dev S8b@0.5 diagnostic only, never tuned on
   real:
     dataset: open_bandit  # semi-synthetic temporal interventions only; never claimed as natural drift
+    # Design fixed 2026-10-24, before any OBD result (decision log 23). Frozen config, NO tuning on OBD.
+    source: Open Bandit Dataset (Saito et al. 2021, CC BY 4.0), random policy, Men campaign (452,949 rows, 34 items)
+    real_parts: contexts and their real temporal order (7 days); base reward shape fit on real clicks
+    synthetic_parts: actions (drawn from the regime's logger), propensities (exact), rewards, injected
+      logger/reward drift. Natural context drift = whatever the real time order contains (not injected).
+    contexts: one-hot user features 0-3 (31) + log1p(sum, max) user-item affinity -> standardize -> PCA d=8,
+      each PC scaled to unit variance (fit on all rows)
+    windows: rows sorted by timestamp, 13 equal-count blocks; blocks 0-11 = history, block 12 = target period
+    base_reward: per-action logistic on [x, x^2] fit on real clicks (uniform logging -> unbiased);
+      intercepts shifted by one constant so mean CTR = 0.05 (real CTR 0.005 makes per-window DR degenerate);
+      the x^2 part makes the methods' linear reward model misspecified
+    drift: reward/logger WindowSpecs from the simulator regimes (context_shift ignored); g, loggers drawn per env seed
+    regimes: {S0: [0.0], S2: [0.0], S3a: [0.5, 1.0], S4: [0.5, 1.0], S5: [1.0]}
+    env_seeds: [200, 201, 202, 203]
+    data_seeds: {start: 20000, count: 50}  # per env seed: resampled contexts per block + actions + rewards
+    sizes: {n_per_window: 5000, n_anchor: 1000, n_target_contexts: 10000}  # anchor/target disjoint, from block 12
+    truth: exact average over ALL block-12 contexts of sum_a pi(a|x) q_T(x, a)
+    report: same tables/breakdowns as test; descriptive only (no go/no-go)
 
 tuning:  # dev split only
   lambda_grid: [0.25, 0.5, 1.0, 2.0, 4.0]   # bias-penalty weight ("mse" selector ablation)
