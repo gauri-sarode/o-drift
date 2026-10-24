@@ -186,22 +186,22 @@ def main():
         go = []
         drift = [k for k in summary if k.split("@")[0] in ("S3a", "S3b", "S4", "S5")]
         wins = [k for k in drift if summary[k]["ratio"] <= 0.90 and summary[k]["ci"][1] < 0]
-        go.append((f"RMSE <= 0.9x best in >= 2 reward-drift cells (won {len(wins)}: {wins})", len(wins) >= 2))
+        go.append((f"RMSE <= 0.9x best in >= 2 reward-drift cells (won {len(wins)}: {wins})", bool(len(wins) >= 2)))
         stat = [k for k in summary if k.split("@")[0] in ("S0", "S1", "S2")]
-        go.append(("RMSE <= 1.1x best in S0/S1/S2", all(summary[k]["ratio"] <= 1.10 for k in stat)))
-        go.append(("coverage(split) >= 0.93 everywhere", all(summary[k]["coverage_split"] >= 0.93 for k in summary)))
+        go.append(("RMSE <= 1.1x best in S0/S1/S2", bool(all(summary[k]["ratio"] <= 1.10 for k in stat))))
+        go.append(("coverage(split) >= 0.93 everywhere", bool(all(summary[k]["coverage_split"] >= 0.93 for k in summary))))
         s7 = [k for k in data["cells"] if k.startswith("S7@")]
         if s7:
             cell = data["cells"][s7[0]]
             frac_ok = np.mean([sum(p["weights"][w] for w in p["deficient"]) <= 0.05
                                for r in cell["reps"] for p in r[od]])
-            go.append((f"S7: weight on support-deficient windows <= 0.05 in >= 90% (got {frac_ok:.3f})", frac_ok >= 0.90))
+            go.append((f"S7: weight on support-deficient windows <= 0.05 in >= 90% (got {frac_ok:.3f})", bool(frac_ok >= 0.90)))
         no_anchor = ROOT / "results/03_test_anchor0.json"
         if no_anchor.exists():
             na = json.loads(no_anchor.read_text())
             statuses = [p["status"] for c in na["cells"].values() for r in c["reps"] for p in r["odrift"]]
             frac = np.mean([s_ == "not_certified" for s_ in statuses])
-            go.append((f"no anchor -> not certified in 100% (got {frac:.3f})", frac == 1.0))
+            go.append((f"no anchor -> not certified in 100% (got {frac:.3f})", bool(frac == 1.0)))
         else:
             go.append(("no-anchor run missing (run 03_evaluate --split test --n-anchor 0)", False))
         for crit, ok in go:

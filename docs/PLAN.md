@@ -264,3 +264,19 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    checks on DEV seeds only (S5@0.5, S6@0.0, S8b@1.0 x 4 episodes, no-anchor S0) confirmed
    the pipeline runs; their outputs were deleted unanalysed (S8b@1.0 is a test intensity
    but those were dev-seed episodes; no test data touched).
+21. **TEST RESULTS (2026-10-24, one shot, frozen config; results/03_test.json,
+   03_test_anchor0.json, 04_test_summary.json, logs/04_test.log)**. Go/no-go: 5/5 PASS
+   (wins <=0.9x with CI<0 in S3a@1.0 0.89, S4@0.25 0.82, S4@1.0 0.75, S5@1.0 0.85 -- S5 is
+   the held-out drift type; S0/S1/S2 <= 1.1x; split coverage (vacuous bound, as pre-noted);
+   S7 deficient weight 1.000; no-anchor never certified 1.000).
+   Other cells, O-DRIFT / best tuned baseline: S1@0.5 0.96*, S1@2.0 1.01, S0 1.04 (CI>0),
+   S2 1.07 (CI>0), S3a@0.25 0.91*, S5@0.5 1.04, S6 1.02, S8@0.5 1.00.
+   Losses: S3b@0.25 1.35, S3b@1.0 2.31 (vs time-aware DR; O-DRIFT 22.6 still beats every
+   other baseline, best non-timedr = recent-6 34.8; bias -13.2 at test intensity, sign
+   opposite to dev); S7 1.44 vs MinVar (price of excluding support-deficient windows);
+   S8@1.0 1.10, S8b@1.0 1.13 vs recent-6 (misspecified drift at high intensity: mild loss,
+   no breakdown; bias ~0, variance cost of correction).
+   Informative (hetero) interval: 0.94-0.96 without reward drift, 0.88-0.90 S3a/S4@0.25/S8,
+   poor in S3b (0.65/0.36), S4@1.0 (0.74), S5 (0.33/0.15) -> must be reported as a
+   limitation; certified Liu interval 0.91-0.92 everywhere (hw ~0.08).
+   Fix after test: 04_analyze JSON bool serialisation only (no re-tuning, no method change).
