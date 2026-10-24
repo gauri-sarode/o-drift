@@ -280,3 +280,13 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    poor in S3b (0.65/0.36), S4@1.0 (0.74), S5 (0.33/0.15) -> must be reported as a
    limitation; certified Liu interval 0.91-0.92 everywhere (hw ~0.08).
    Fix after test: 04_analyze JSON bool serialisation only (no re-tuning, no method change).
+22. **Anchor-consistency check for the model-based interval (2026-10-24, dev only) — rejected**.
+   Rule: z = |V_odrift - V_ref| / SE(diff) (anchor's weight in O-DRIFT accounted for);
+   z > c -> report certified Liu interval instead of the hetero interval. Ref = anchor DR or
+   Liu; c in {1, 1.5, 2, 2.5}. Fallback rate is the same in every dev cell (~0.30/0.13/0.07/0.03
+   = the null rate): zero power. Anchor-difference SE ~41e-3 vs biases to detect 4-25e-3
+   (needs ~115e-3 for 80% power). Coverage gets WORSE in every cell (e.g. S0 0.95 -> 0.89-0.93,
+   S3b 0.73 -> 0.69-0.76): fallback fires when the anchor is unlucky, and the certified interval
+   is then centered near that unlucky anchor (selection effect). Not run on test. Paper:
+   information-limit paragraph -- with n_anchor = 1000 the anchor cannot validate the history
+   at the bias scale that matters; detecting a 4e-3 bias needs ~10^5-10^6 anchor records.
