@@ -16,6 +16,8 @@ simulator:
   n_per_window: 5000
   n_anchor_default: 1000
   anchor_sweep: [0, 100, 1000, 10000]
+  anchor_sweep_cells: [S0@0.0, S1@2.0, S2@0.0, S3a@1.0, S3b@1.0, S4@1.0, S5@1.0, S8@1.0]  # fixed 2026-10-24
+                     # before running 100/10000 (one cell per drift type, higher test intensity; frozen config)
   n_target_contexts: 10000
   n_mc_truth: 1000000
 
