@@ -243,3 +243,17 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    kept in code as a documented negative result. Likely reason time-aware DR wins S3b: its
    time model is fit with the anchor at t = 1 (interpolation, not extrapolation) and its
    global linear-in-time model is exactly S3b's drift. S3b reported as a stated loss.
+19. **Anchor in the joint reward model + S8b diagnostic (2026-10-24)**. results/06_anchor_trend.json,
+   full dev seeds. RMSE x1e3 joint / +anchor / +anchor+shared trend / +anchor+segment trend:
+   S0 5.53/5.49/8.57/8.57, S1 6.18/6.18/9.89/9.89, S2 5.23/5.24/9.38/9.38,
+   S3a 6.46/6.41/8.88/9.66, S3b 9.44/9.23/9.74/9.84, S4 10.26/10.40/15.94/17.54,
+   S8 6.70/6.65/8.96/9.87; mean log (dev) -4.970/-4.974/-4.590/-4.558.
+   Anchoring the trend at t = 1 does NOT remove the trend's variance cost: S0 goes 5.5 -> 8.6,
+   the same as time-aware DR (8.59). The cost is endpoint-of-regression variance, inherent to
+   any time-slope model; it only pays off when drift is exactly linear in time (S3b). So S3b
+   cannot be won without losing ~55% in every other cell -> stated loss, with this
+   bias-variance explanation (strong paper point). Anchor-in-model without trend: negligible
+   gain (-0.004) and weakens the anchor's independence for reference selection -> not adopted.
+   S8b@0.5 dev diagnostic (results/03_dev_S8b_diagnostic.json): O-DRIFT 7.07 vs best
+   (tbdecay) 6.83, ratio 1.04, CI [-0.31, +0.80]e-3; monitor splits 177/200; drift is weak
+   at value level (pooled bias +0.3) -> inconclusive as a stress test; test S8b@1.0 decides.
