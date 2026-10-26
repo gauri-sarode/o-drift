@@ -1,0 +1,8 @@
+S0@0.0     n=200  best: minvar_dr=0.0031  decay_dr[0.95]=0.0031  odrift[0.0001,5.0,1]=0.0031  slope[3.0]=0.0031  pooled_dr=0.0031  recent_dr[12]=0.0031
+S2@0.0     n=200  best: odrift[0.0001,5.0,1]=0.0029  balanced_dr=0.0029  tbdecay[0.9]=0.0030  minvar_dr=0.0034  slope[3.0]=0.0038  pooled_dr=0.0038
+S3a@0.5    n=200  best: recent_dr[6]=0.0044  monitor_select_dr=0.0044  timedr[1]=0.0048  oracle=0.0052  recent_dr[4]=0.0053  recent_dr[3]=0.0065
+S3a@1.0    n=200  best: recent_dr[6]=0.0044  monitor_select_dr=0.0044  timedr[1]=0.0050  oracle=0.0052  recent_dr[4]=0.0053  recent_dr[3]=0.0065
+S4@0.5     n=200  best: timedr[1]=0.0088  recent_dr[8]=0.0105  monitor_select_dr=0.0108  ablate_nobalance[0.0001,5.0,1]=0.0134  trecent[8]=0.0135  recent_dr[6]=0.0137
+S4@1.0     n=200  best: recent_dr[8]=0.0105  timedr[1]=0.0134  trecent[8]=0.0135  recent_dr[6]=0.0137  oracle=0.0137  monitor_select_dr=0.0171
+S5@1.0     n=200  best: oracle=0.0107  liu_reg[6]=0.0202  recent_dr[1]=0.0292  monitor_select_dr=0.0292  ablate_mse=0.0298  anchor_validated=0.0353
+wrote /Users/gauris/dev/o-drift/results/03_obd.json

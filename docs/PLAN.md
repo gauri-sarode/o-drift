@@ -317,3 +317,17 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
      threshold never rejects. Scope statement for the paper: O-DRIFT targets the small-anchor
      regime (anchor << history); with a large anchor, check the anchor-only estimator, or
      scale the threshold with n_anchor (future work; not tuned here).
+25. **Open Bandit results (2026-10-26; frozen config, pre-registered cells, run once;
+   results/03_obd.json)**. RMSE x1e-3, O-DRIFT vs the best non-oracle baseline:
+   S0 3.1 vs 3.1 (1.01), S2 2.9 vs 2.9 (0.98, rank 1), S3a@.5 8.4 vs recent[6] 4.4 (1.91),
+   S3a@1 11.5 vs 4.4 (2.61), S4@.5 17.5 vs timedr 8.8 (1.98), S4@1 47.9 vs recent[8] 10.5 (4.55),
+   S5@1 68.0 vs Liu 20.2 (3.37). Under reward drift O-DRIFT errors are mostly bias (+6 to +60e-3),
+   and its interval coverage collapses in S4@1 (0.55) and S5 (0.01). The no-balancing ablation
+   is just as biased, so balancing is not the cause; the drift-corrected reuse is.
+   Post-hoc diagnosis (label as such): the simulator's base reward is about 98% linear (the
+   nonlinear share of logit variance is 0.02 at misspec=0.5), so the per-action logistic model
+   is close to correct there. The OBD base fit to real clicks has a nonlinear share of 0.41,
+   and its drift (g sd 1.84) is 3x the base logit sd (0.61). The correction assumes the
+   reward-model class captures base + drift; on realistic rewards it does not, and the reused
+   old windows carry bias that the 1000-row anchor (anchor-only DR RMSE 35.7e-3) cannot
+   detect. In-class/low-misspecification simulator results therefore overstate O-DRIFT.
