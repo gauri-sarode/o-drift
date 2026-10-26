@@ -2,3 +2,8 @@ S0@0.0     n=300  best: pooled_dr=0.0054  recent_dr[12]=0.0054  balanced_dr=0.00
 S1@2.0     n=300  best: odrift[0.0001,5.0,1]=0.0090  tbdecay[0.9]=0.0091  ablate_nobalance[0.0001,5.0,1]=0.0094  oracle=0.0095  transport_dr=0.0095  tdecay[0.9]=0.0097
 S2@0.0     n=300  best: balanced_dr=0.0052  odrift[0.0001,5.0,1]=0.0056  tbdecay[0.9]=0.0058  minvar_dr=0.0062  ablate_nobalance[0.0001,5.0,1]=0.0067  pooled_dr=0.0069
 S3a@1.0    n=300  best: recent_dr[6]=0.0079  monitor_select_dr=0.0079  oracle=0.0083  odrift[0.0001,5.0,1]=0.0091  ablate_nobalance[0.0001,5.0,1]=0.0092  recent_dr[4]=0.0099
+S3b@1.0    n=300  best: timedr[1]=0.0102  forecast[1]=0.0151  oracle=0.0207  recent_dr[2]=0.0215  recent_dr[1]=0.0225  monitor_select_dr=0.0230
+S4@1.0     n=300  best: ablate_nobalance[0.0001,5.0,1]=0.0195  odrift[0.0001,5.0,1]=0.0197  oracle=0.0275  recent_dr[4]=0.0316  decay_dr[0.7]=0.0323  monitor_select_dr=0.0333
+S5@1.0     n=300  best: oracle=0.0142  odrift[0.0001,5.0,1]=0.0408  ablate_nobalance[0.0001,5.0,1]=0.0420  odrift_split[0.0001,5.0,1]=0.0471  magic[1.96]=0.0532  pooled_dr=0.0534
+S8@1.0     n=300  best: recent_dr[6]=0.0079  monitor_select_dr=0.0079  oracle=0.0084  ablate_nobalance[0.0001,5.0,1]=0.0093  odrift[0.0001,5.0,1]=0.0096  recent_dr[4]=0.0099
+wrote /Users/gauris/dev/o-drift/results/03_test_anchor100.json

@@ -300,6 +300,8 @@ def main():
     reps = args.reps or split["data_seeds"]["count"]
     start = split["data_seeds"]["start"]
 
+    suffix = "" if args.n_anchor == SIM["n_anchor_default"] else f"_anchor{args.n_anchor}"
+    path = ROOT / (args.out or f"results/03_{args.split}{suffix}.json")
     out = dict(split=args.split, n_anchor=args.n_anchor, reps_per_env=reps, env_seeds=split["env_seeds"],
                grid={k: [list(v) if isinstance(v, tuple) else v for v in vs] for k, vs in grid.items()}, cells={})
     with ProcessPoolExecutor() as pool:
@@ -318,10 +320,10 @@ def main():
                     for m in results[0]}
             best = sorted(rmse.items(), key=lambda kv: kv[1])[:6]
             print(f"{key:10s} n={len(results)}  best: " + "  ".join(f"{m}={v:.4f}" for m, v in best), flush=True)
+            path.with_suffix(".partial.json").write_text(json.dumps(out))  # per-cell checkpoint
 
-    suffix = "" if args.n_anchor == SIM["n_anchor_default"] else f"_anchor{args.n_anchor}"
-    path = ROOT / (args.out or f"results/03_{args.split}{suffix}.json")
     path.write_text(json.dumps(out))
+    path.with_suffix(".partial.json").unlink(missing_ok=True)
     print(f"wrote {path}")
 
 

@@ -302,3 +302,18 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    Engineering (behaviour-preserving, verified max diff 3e-16 vs old code, tests pass):
    per-action logistic predictions computed from coefficients instead of materializing the
    (n*A, A(1+d)) feature matrix -> OBD episode 374 s -> 88 s.
+24. **Anchor-size sweep (2026-10-26; pre-registered anchor_sweep_cells, frozen config, test seeds;
+   results/03_test_anchor{100,10000}.json, summary results/05_anchor_sweep.json)**. History is
+   12 x 5000. Ratios O-DRIFT / best non-oracle baseline at n_anchor 100 / 1000 / 10000 (paired
+   bootstrap CI in the summary file): S0 1.05/1.04/1.05, S1@2 0.99/1.01/1.03, S2 1.07/1.07/1.06,
+   S3a@1 1.15 (CI 0.86-1.60)/0.89/0.93, S3b@1 2.26/2.31/2.48 (vs timedr), S4@1 0.62/0.75/1.17,
+   S5@1 0.77/0.85/2.40 (vs anchor-only DR), S8@1 1.21/1.10/1.14.
+   - Certified (Liu) interval: coverage 0.78 at n=100 (normal approximation fails; hw 0.20),
+     0.92-0.93 at 1000 (hw 0.08) and 10000 (hw 0.027). Anchor-only DR covers 0.92-0.94 at all sizes.
+   - O-DRIFT RMSE is nearly anchor-independent: the anchor only picks/validates the reference.
+   - Post-hoc finding (label as such): O-DRIFT does not exploit a large anchor. At n=10000 the
+     anchor-only DR (RMSE 14e-3) beats it in S5 (33.7e-3) and recent-window transport beats it in
+     S4. Its residual bias (~20-35e-3) is below z_anchor=5 x the anchor SE, so the fixed
+     threshold never rejects. Scope statement for the paper: O-DRIFT targets the small-anchor
+     regime (anchor << history); with a large anchor, check the anchor-only estimator, or
+     scale the threshold with n_anchor (future work; not tuned here).
