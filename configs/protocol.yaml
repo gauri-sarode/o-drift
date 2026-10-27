@@ -99,6 +99,12 @@ v2:
     weights minimise the debiased MSE with each component's bias measured against the reference
     (reference segment + anchor, min-variance): d = V - r.V, Cov(d) = P S P^T (existing shrink_select).
     reuse_lam = 0 is exactly v1.
+  amendment_a: >-
+    2026-10-27, before any dev2 run (mechanism check on 3 dev episodes + unit tests only): shrink_select's
+    unbiased bias^2 estimate d^2 - Var(d) is often negative and cancels a segment's own variance
+    (weight moved TOWARD old segments as lam grew). Replaced by reference_validated_weights: reference
+    and anchor treated as unbiased (b = 0), other segments b_i = sign(d_i) sqrt(max(d_i^2 - Var(d_i), 0)),
+    Q = S + lam b b^T. Grid unchanged.
   fixed_from_v1: {monitor_alpha: 0.0001, z_anchor: 5.0, joint_segments: true}  # v1 tuned values, not re-tuned
   reuse_lam_grid: [0.0, 0.5, 1.0, 2.0, 4.0]
   not_changed: >-

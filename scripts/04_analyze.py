@@ -16,8 +16,8 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-FAMILY = re.compile(r"^(recent_dr|decay_dr|liu_reg|odrift_split|odrift|slope|magic|trecent|tdecay|forecast|timedr|tbdecay)\[(.+)\]$")
-FAMILY_KEY = {"recent_dr": "recent", "decay_dr": "decay", "liu_reg": "liu", "odrift": "odrift",
+FAMILY = re.compile(r"^(recent_dr|decay_dr|liu_reg|odrift_split|odrift2|odrift|slope|magic|trecent|tdecay|forecast|timedr|tbdecay)\[(.+)\]$")
+FAMILY_KEY = {"recent_dr": "recent", "decay_dr": "decay", "liu_reg": "liu", "odrift": "odrift", "odrift2": "odrift2",
               "slope": "slope", "magic": "magic", "trecent": "trecent", "tdecay": "tdecay",
               "forecast": "forecast", "timedr": "timedr", "tbdecay": "tbdecay"}
 BASELINES = ["pooled_dr", "anchor_dr", "recent_dr", "decay_dr", "minvar_dr", "liu_reg", "transport_dr"]
@@ -107,25 +107,30 @@ def print_table(rows):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--split", choices=["dev", "test"], required=True)
+    ap.add_argument("--split", choices=["dev", "test", "dev2", "test2", "obd2"], required=True)
     ap.add_argument("--file", default=None)
     args = ap.parse_args()
     data = json.loads((ROOT / (args.file or f"results/03_{args.split}.json")).read_text())
+    v2 = args.split.endswith("2")
+    tuned_path = ROOT / ("results/tuned_v2.json" if v2 else "results/tuned.json")
 
-    if args.split == "dev":
+    if args.split.startswith("dev"):
         tuned, report = tune(data)
         for fam, means in report.items():
             print(f"{fam:8s} " + "  ".join(f"{s}:{v:.3f}" for s, v in list(means.items())[:5]))
-        (ROOT / "results/tuned.json").write_text(json.dumps(tuned, indent=2))
-        print(f"\ntuned: {tuned}  -> results/tuned.json")
+        tuned_path.write_text(json.dumps(tuned, indent=2))
+        print(f"\ntuned: {tuned}  -> {tuned_path.relative_to(ROOT)}")
     else:
-        tuned = json.loads((ROOT / "results/tuned.json").read_text())
+        tuned = json.loads(tuned_path.read_text())
 
     def name(fam, prefix):
         v = tuned[fam]
         return f"{prefix}[{','.join(str(x) for x in v)}]" if isinstance(v, list) else f"{prefix}[{v}]"
 
     od, ods = name("odrift", "odrift"), name("odrift", "odrift_split")
+    od1 = od
+    if v2:  # the method under test is v2; v1 (same fits) is reported alongside
+        od = name("odrift2", "odrift2")
     tuned_baselines = ["pooled_dr", "anchor_dr", name("recent", "recent_dr"), name("decay", "decay_dr"),
                        "minvar_dr", name("liu", "liu_reg"), "transport_dr"]
     for fam, prefix in (("slope", "slope"), ("magic", "magic"), ("trecent", "trecent"), ("tdecay", "tdecay"),
@@ -141,7 +146,7 @@ def main():
                 best_m = min(members, key=lambda m: rmse(cell, m))
                 for r in cell["reps"]:
                     r[f"{fam}_oracletuned"] = r[best_m]
-    methods = tuned_baselines + [od, ods, "recent_dr_oracletuned", "decay_dr_oracletuned",
+    methods = tuned_baselines + ([od1] if v2 else []) + [od, ods, "recent_dr_oracletuned", "decay_dr_oracletuned",
                                  "ablate_mse", "ablate_bound", "oracle"]
     rows = table(data, methods)
     print_table(rows)
@@ -159,6 +164,7 @@ def main():
         summary[key] = dict(best_baseline=base, diff=d, ci=[lo, hi], ratio=ratio, coverage_split=cov,
                             coverage_hetero=coverage(cell, od), halfwidth_hetero=float(np.mean(per_rep(cell, od, "hw"))),
                             coverage_plugin_narrow=coverage(cell, od, "hw_narrow"),
+                            ratio_v1=rmse(cell, od1) / rmse(cell, base) if v2 else None,
                             coverage_certified_liu=coverage(cell, liu),
                             halfwidth_certified_liu=float(np.mean(per_rep(cell, liu, "hw"))))
         print(f"  {key:10s} vs {base:18s} diff={d * 1e3:+6.2f}e-3 CI=[{lo * 1e3:+6.2f},{hi * 1e3:+6.2f}] "
@@ -182,8 +188,10 @@ def main():
         print(f"  {key:10s} env " + " ".join(f"{x:.2f}" for x in by_env) + " | pol " + " ".join(f"{x:.2f}" for x in by_pol)
               + f" ; bias {eo.mean() * 1e3:+.1f} sd {eo.std() * 1e3:.1f}")
 
-    if args.split == "test":
+    if args.split in ("test", "test2"):
         go = []
+        main_cells = {k: v for k, v in summary.items() if "#m" not in k}  # v2: v1 criteria on misspec-0.5 cells
+        full_summary, summary = summary, main_cells
         drift = [k for k in summary if k.split("@")[0] in ("S3a", "S3b", "S4", "S5")]
         wins = [k for k in drift if summary[k]["ratio"] <= 0.90 and summary[k]["ci"][1] < 0]
         go.append((f"RMSE <= 0.9x best in >= 2 reward-drift cells (won {len(wins)}: {wins})", bool(len(wins) >= 2)))
@@ -196,17 +204,34 @@ def main():
             frac_ok = np.mean([sum(p["weights"][w] for w in p["deficient"]) <= 0.05
                                for r in cell["reps"] for p in r[od]])
             go.append((f"S7: weight on support-deficient windows <= 0.05 in >= 90% (got {frac_ok:.3f})", bool(frac_ok >= 0.90)))
-        no_anchor = ROOT / "results/03_test_anchor0.json"
+        no_anchor = ROOT / f"results/03_{args.split}_anchor0.json"
         if no_anchor.exists():
             na = json.loads(no_anchor.read_text())
-            statuses = [p["status"] for c in na["cells"].values() for r in c["reps"] for p in r["odrift"]]
+            na_key = od if v2 else "odrift"
+            statuses = [p["status"] for c in na["cells"].values() for r in c["reps"] for p in r[na_key]]
             frac = np.mean([s_ == "not_certified" for s_ in statuses])
             go.append((f"no anchor -> not certified in 100% (got {frac:.3f})", bool(frac == 1.0)))
         else:
             go.append(("no-anchor run missing (run 03_evaluate --split test --n-anchor 0)", False))
+        summary = full_summary
+        if v2:  # pre-registered robustness criterion (protocol v2.go_no_go_v2)
+            robust = {k: summary[k]["ratio"] for k in summary if "#m" in k and k.split("@")[0] in ("S3a", "S4", "S5", "S8")}
+            obd2 = ROOT / "results/04_obd2_summary.json"
+            if obd2.exists():
+                robust.update({f"obd2:{k}": v["ratio"] for k, v in json.loads(obd2.read_text())["summary"].items()
+                               if k.split("@")[0] in ("S3a", "S4", "S5")})
+            else:
+                go.append(("obd2 summary missing (run 04_analyze --split obd2 first)", False))
+            print("  robustness cells: " + "  ".join(f"{k}={v:.2f}" for k, v in robust.items()))
+            go.append((f"robustness: no reward-drift cell (misspec 3 + obd2) ratio > 1.5 (max {max(robust.values()):.2f})",
+                       bool(max(robust.values()) <= 1.5)))
+            n_ok = sum(v <= 1.0 for v in robust.values())
+            go.append((f"robustness: ratio <= 1.0 in >= half ({n_ok}/{len(robust)})", bool(2 * n_ok >= len(robust))))
         for crit, ok in go:
             print(f"  [{'PASS' if ok else 'FAIL'}] {crit}")
-        (ROOT / "results/04_test_summary.json").write_text(json.dumps(dict(summary=summary, go=go), indent=2))
+        (ROOT / f"results/04_{args.split}_summary.json").write_text(json.dumps(dict(summary=summary, go=go), indent=2))
+    elif args.split == "obd2":
+        (ROOT / "results/04_obd2_summary.json").write_text(json.dumps(dict(summary=summary), indent=2))
 
 
 if __name__ == "__main__":

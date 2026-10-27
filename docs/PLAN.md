@@ -341,3 +341,9 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    One-shot tests on fresh seeds: test2 (env 500-503) and real2 (OBD env 400-403).
    Criteria: v1's five go/no-go on test2 at misspec 0.5, plus robustness on the reward-drift cells
    (misspec 3 + real2): no ratio > 1.5 and ratio <= 1.0 in at least half.
+   Amendment (a), before any dev2 run: the shrink_select form (unbiased bias^2 = d^2 - Var d) moved
+   weight toward old segments as lam grew, because a negative bias^2 estimate cancels the segment's
+   own variance (seen in 3 dev episodes). Replaced by the positive part, with reference and anchor
+   treated as unbiased: `reference_validated_weights`. Unit tests check that a constructed biased
+   segment is dropped and that no detectable bias gives the v1 weights. The v1 dev path reproduces
+   the stored dev results to 2e-13.

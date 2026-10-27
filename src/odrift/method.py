@@ -388,6 +388,31 @@ def shrink_select(comps: list, S: np.ndarray, cfg, lam: float, groups: list | No
     return select_weights(S, np.zeros(len(comps)), 0.0, Q=mse_objective(S, d, C, lam))
 
 
+def reference_validated_weights(comps: list, S: np.ndarray, ref_pos: list, lam: float) -> np.ndarray:
+    """v2 reference-validated reuse (anchor last; ref_pos = reference-segment positions).
+
+    The reference r = (reference segment + anchor) at minimum variance is assumed unbiased.
+    Every other component's bias is estimated by d_i = V_i - r.V with Var(d_i) = (e_i - r)^T S (e_i - r);
+    the squared bias by its positive part max(d_i^2 - Var(d_i), 0) (the plain unbiased
+    estimate is often negative and would cancel the component's own variance), keeping the
+    sign of d_i. Weights minimise alpha^T S alpha + lam (alpha . b)^2 over the simplex.
+    """
+    n = len(comps)
+    idx = sorted(set(ref_pos) | {n - 1})
+    r = np.zeros(n)
+    r[idx] = select_weights(S[np.ix_(idx, idx)], np.zeros(len(idx)), 0.0)
+    values = np.array([c.value for c in comps])
+    b = np.zeros(n)
+    for i in range(n):
+        if i in idx:
+            continue
+        e = -r.copy()
+        e[i] += 1
+        d, var_d = values[i] - r @ values, e @ S @ e
+        b[i] = np.sign(d) * np.sqrt(max(d * d - var_d, 0.0))
+    return select_weights(S, b, lam)
+
+
 # ------------------------------------------------------------------ O-DRIFT
 
 @dataclass
@@ -408,6 +433,8 @@ class ODriftConfig:
     model_anchor: bool = False    # joint fit only: anchor records join the newest segment at t = 1, so the
                                   # target-time prediction is interpolated, not extrapolated
     anchor_sn: bool = False      # self-normalized DR for the anchor component
+    reuse_lam: float = 0.0       # v2 reference-validated reuse: > 0 = debiased-MSE weights over balanced segment
+                                 # components, bias measured against reference segment + anchor; 0 = v1 pooling
     delta_variance: float = 0.025
     delta_bias: float = 0.025
     delta_diagnostics: float = 0.01
@@ -601,6 +628,8 @@ def combine(comps: list, anchor_comp, cfg: ODriftConfig, lam: float | None = Non
         alpha = segment_select(sel, S_sel, cfg.z_group, cfg.z_anchor, cfg.fallback, cfg.grouping, groups)
     elif cfg.selection == "shrink":
         alpha = shrink_select(sel, S_sel, cfg, lam, groups)
+    elif cfg.selection == "refmse":  # v2: groups[0] = reference segment
+        alpha = reference_validated_weights(sel, S_sel, groups[0] if groups else [], lam)
     elif cfg.selection == "mse":
         d_sel, C_sel = diff_moments(sel, S_sel)
         alpha = select_weights(S_sel, B, lam, Q=mse_objective(S_sel, d_sel, C_sel, lam))
@@ -836,7 +865,13 @@ def odrift_balanced(history: list, anchor: LoggedData, X_target: np.ndarray, pi,
                                                    segments, logger_fns, ref_segment, comps)
     if ref_segment is None or not seg_comps:
         return combine(comps, anc, cfg, window_groups=segments)
-    res = combine(seg_comps, anc_c, replace(cfg, **POOL))
+    ref_idx = 1000 + next(j for j, seg in enumerate(segments) if seg is ref_segment)
+    if cfg.reuse_lam > 0 and any(c.index == ref_idx for c in seg_comps):
+        # v2: the other segments keep weight only as far as their discrepancy from the
+        # reference (reference segment + anchor) is explained by noise
+        res = combine(seg_comps, anc_c, replace(cfg, selection="refmse"), cfg.reuse_lam, window_groups=[[ref_idx]])
+    else:
+        res = combine(seg_comps, anc_c, replace(cfg, **POOL))
     res.se_hetero = heterogeneity_se(res, seg_comps, anc_c)
     # report weights per window (segment weight split by record share) + anchor (index K)
     window_w = {k: 0.0 for k in range(len(history) + 1)}

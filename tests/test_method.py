@@ -186,3 +186,53 @@ def test_balanced_weights_reported_per_window_and_exclude_deficient():
     deficient = [k for k, why in r.reasons.items() if "target_support" in why]
     assert deficient and sum(r.weights[k] for k in deficient) == 0
     assert sum(r.weights[k] for k in range(regime.n_windows) if k not in deficient) > 0.5
+
+
+def _synthetic_comps(shifts, n=4000, M=2000, seed=0):
+    """Components sharing one DM term (as drift-corrected segments do) with corrections
+    whose means are shifted by `shifts`; the last one plays the anchor (n/10 records)."""
+    from odrift.method import Component, Diagnostics
+    rng = np.random.default_rng(seed)
+    dm = rng.normal(0.5, 0.1, M)
+    comps = []
+    for i, s in enumerate(shifts):
+        m = n if i < len(shifts) - 1 else n // 10
+        comps.append(Component(i, 0.0, dm, rng.normal(s, 1.0, m), Diagnostics(m, 0, 0, 0, m)))
+        comps[-1].value = float(dm.mean() + comps[-1].corr_scores.mean())
+    return comps
+
+
+def test_reference_validated_weights_drop_biased_and_keep_unbiased_segments():
+    from odrift.method import covariance, reference_validated_weights
+    # [old biased, old unbiased, reference, anchor]
+    comps = _synthetic_comps([0.3, 0.0, 0.0, 0.0])
+    S = covariance(comps)
+    a = reference_validated_weights(comps, S, [2], lam=1.0)
+    assert abs(a.sum() - 1) < 1e-9 and a[0] < 0.01 and a[1] > 0.3, a
+    # no detectable bias -> identical to minimum-variance pooling (v1)
+    comps = _synthetic_comps([0.0, 0.0, 0.0, 0.0], seed=1)
+    S = covariance(comps)
+    from odrift.method import select_weights
+    a0 = select_weights(S, np.zeros(4), 0.0)
+    a = reference_validated_weights(comps, S, [2], lam=4.0)
+    assert np.allclose(a, a0, atol=1e-6), (a, a0)
+
+
+def test_reuse_lam_zero_is_v1():
+    from dataclasses import replace
+    from odrift.method import ODriftConfig, fit_all_nuisances, odrift_balanced
+    from odrift.monitor import ResidualStats, reward_changepoints
+    from odrift.simulator import mu
+    regime = REGIMES["S3a"](1.0)
+    fns = [lambda X, sp=sp: mu(ENV, sp, X) for sp in regime.windows]
+    cfg = ODriftConfig(z_anchor=5.0, fallback="least", context_alpha=0.01, joint_segments=True)
+    ep = sample_episode(ENV, regime, 3000, 1000, 4000, seed=0)
+    segs = reward_changepoints(ResidualStats(ep.history, ENV.n_actions), 1e-4)
+    nuis = fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, ENV.n_actions, cfg, segments=segs)
+    r1 = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, PI, ENV.n_actions, cfg, nuis, segs, fns)
+    r2 = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, PI, ENV.n_actions, replace(cfg, reuse_lam=0.0),
+                         nuis, segs, fns)
+    r3 = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, PI, ENV.n_actions, replace(cfg, reuse_lam=2.0),
+                         nuis, segs, fns)
+    assert r1.value == r2.value and r1.weights == r2.weights
+    assert abs(sum(r3.weights.values()) - 1) < 1e-6 and set(r3.weights) == set(range(regime.n_windows + 1))

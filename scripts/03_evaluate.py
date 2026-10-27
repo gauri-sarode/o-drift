@@ -33,16 +33,23 @@ from odrift.simulator import EnvParams, LoggedData, Policy, mu, sample_episode, 
 
 ROOT = Path(__file__).resolve().parents[1]
 PROTOCOL = yaml.safe_load((ROOT / "configs/protocol.yaml").read_text())
-SIM, TUNE = PROTOCOL["simulator"], PROTOCOL["tuning"]
+SIM, TUNE, V2 = PROTOCOL["simulator"], PROTOCOL["tuning"], PROTOCOL["v2"]
+SPLIT_KEY = {"dev": "dev", "test": "test", "obd": "real", "dev2": "dev2", "test2": "test2", "obd2": "real2"}
 CFG = ODriftConfig(delta_variance=TUNE["delta_split"]["variance"], delta_bias=TUNE["delta_split"]["bias"],
                    **TUNE["odrift_fixed"])
 Z95 = 1.959964
 
 
-def make_env(seed, dataset="sim"):
+def make_env(seed, dataset="sim", misspec=None):
     if dataset == "obd":
         return obd.OBDEnv.sample(seed)
-    return EnvParams.sample(seed, d=SIM["d"], n_actions=SIM["n_actions"], misspec=SIM["misspec"])
+    return EnvParams.sample(seed, d=SIM["d"], n_actions=SIM["n_actions"],
+                            misspec=SIM["misspec"] if misspec is None else misspec)
+
+
+def cell_key(regime_name, intensity, misspec):
+    """'S3a@0.5' at the default misspec; 'S3a@0.5#m3.0' for v2's misspec cells."""
+    return f"{regime_name}@{intensity}" + ("" if misspec is None else f"#m{misspec}")
 
 
 def make_episode(env, regime, n_anchor, seed, dataset="sim"):
@@ -55,8 +62,8 @@ def policies(env, env_seed):
     return [Policy.near_optimal(env, noise=s, seed=env_seed) for s in noises]
 
 
-def truths_for(regime_name, intensity, env_seed, dataset="sim"):
-    env = make_env(env_seed, dataset)
+def truths_for(regime_name, intensity, env_seed, dataset="sim", misspec=None):
+    env = make_env(env_seed, dataset, misspec)
     regime = REGIMES[regime_name](intensity, K=SIM["n_windows"])
     out = []
     for pi in policies(env, env_seed):
@@ -85,7 +92,11 @@ def method_grid(split, tuned):
         "timedr": TUNE["baseline_grids"]["time_dr_degree"],
         "tbdecay": TUNE["baseline_grids"]["transport_balanced_decay"],
     }
-    if split == "test":
+    if split in ("dev2", "test2"):  # v2: v1's tuned O-DRIFT kept for comparison + the reuse_lam family
+        fx = V2["fixed_from_v1"]
+        grid["odrift"] = [(fx["monitor_alpha"], fx["z_anchor"], int(fx["joint_segments"]))]
+        grid["odrift2"] = V2["reuse_lam_grid"]
+    if split in ("test", "test2"):
         full = {k: grid[k] for k in ("recent", "decay")}  # for oracle-tuned upper bounds only
         grid = {fam: [tuple(tuned[fam]) if isinstance(tuned[fam], list) else tuned[fam]] for fam in grid}
         grid.update(full)
@@ -93,8 +104,8 @@ def method_grid(split, tuned):
 
 
 def run_one(args):
-    regime_name, intensity, env_seed, data_seed, n_anchor, truths, grid, dataset = args
-    env = make_env(env_seed, dataset)
+    regime_name, intensity, env_seed, data_seed, n_anchor, truths, grid, dataset, misspec = args
+    env = make_env(env_seed, dataset, misspec)
     regime = REGIMES[regime_name](intensity, K=SIM["n_windows"])
     pis = policies(env, env_seed)
     ep = make_episode(env, regime, n_anchor, data_seed, dataset)
@@ -164,6 +175,10 @@ def run_one(args):
             r = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, pi, A, replace(CFG, z_anchor=za),
                                 seg_nuis[(m, j)], segments[m], logger_fns)
             put("odrift", r.value, r.half_width, status=r.status)
+            for lam in grid.get("odrift2", []):
+                r = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, pi, A,
+                                    replace(CFG, z_anchor=za, reuse_lam=lam), seg_nuis[(m, j)], segments[m], logger_fns)
+                put(f"odrift2[{lam}]", r.value, r.half_width, status=r.status)
             continue
         e = dr_on("anchor")
         put("anchor_dr", e.value, Z95 * e.se)
@@ -239,6 +254,15 @@ def run_one(args):
             put(f"odrift[{m},{za},{j}]", r.value, hw_re, hw_narrow=float(Z95 * r.se), hw_certified_bound=float(r.half_width),
                 status=r.status, weights=[r.weights.get(k, 0.0) for k in range(K + 1)],
                 deficient=deficient, ineligible=sorted(r.reasons), n_segments=len(segments[m]))
+            if (m, za, j) == tuple(grid["odrift"][0]):
+                for lam in grid.get("odrift2", []):  # v2: reference-validated reuse on the same fits
+                    r = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, pi, A,
+                                        replace(CFG, z_anchor=za, reuse_lam=lam), seg_nuis[(m, j)], segments[m],
+                                        logger_fns)
+                    deficient = [k for k, reasons in r.reasons.items() if "target_support" in reasons]
+                    put(f"odrift2[{lam}]", r.value, Z95 * (r.se_hetero if r.se_hetero is not None else r.se),
+                        hw_narrow=float(Z95 * r.se), status=r.status, weights=[r.weights.get(k, 0.0) for k in range(K + 1)],
+                        deficient=deficient, n_segments=len(segments[m]))
         # oracle selector: true transfer biases, same components
         keep = [c for c in comps if c.diagnostics.eligible] + [anc]
         b = np.array([v_k[c.index] - v_t for c in keep[:-1]] + [0.0])
@@ -281,22 +305,27 @@ def liu_with_model(r_hat, anchor, X_target, pi, A):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--split", choices=["dev", "test", "obd"], required=True)
+    ap.add_argument("--split", choices=list(SPLIT_KEY), required=True)
     ap.add_argument("--reps", type=int, default=None, help="data seeds per env seed")
     ap.add_argument("--cells", nargs="*", default=None)
     ap.add_argument("--n-anchor", type=int, default=SIM["n_anchor_default"])
     ap.add_argument("--out", default=None, help="output path (default results/03_{split}[_anchorN].json)")
     args = ap.parse_args()
-    dataset = "obd" if args.split == "obd" else "sim"
-    split = PROTOCOL["splits"]["real" if dataset == "obd" else args.split]
+    dataset = "obd" if args.split.startswith("obd") else "sim"
+    split = PROTOCOL["splits"][SPLIT_KEY[args.split]]
+    v2 = args.split.endswith("2")
     tuned = None
-    if args.split in ("test", "obd"):  # frozen config only; OBD is never tuned on
+    if args.split in ("test", "obd", "test2", "obd2"):  # frozen config only; OBD is never tuned on
         assert PROTOCOL["status"] == "FROZEN", "protocol must be frozen before touching test"
-        tuned = json.loads((ROOT / "results/tuned.json").read_text())
-    grid = method_grid("test" if dataset == "obd" else args.split, tuned)
-    cells = [(r, i) for r, ints in split["regimes"].items() for i in ints]
+        tuned = json.loads((ROOT / ("results/tuned_v2.json" if v2 else "results/tuned.json")).read_text())
+    grid = method_grid(("test2" if v2 else "test") if dataset == "obd" else args.split, tuned)
+    cells = [(r, i, None) for r, ints in split["regimes"].items() for i in ints]
+    cells += [(r, i, V2["misspec_high"]) for r, ints in split.get("misspec_regimes", {}).items() for i in ints]
     if args.cells:
-        cells = [(c.split("@")[0], float(c.split("@")[1])) for c in args.cells]
+        def parse(c):
+            c, _, m = c.partition("#m")
+            return c.split("@")[0], float(c.split("@")[1]), float(m) if m else None
+        cells = [parse(c) for c in args.cells]
     reps = args.reps or split["data_seeds"]["count"]
     start = split["data_seeds"]["start"]
 
@@ -305,14 +334,14 @@ def main():
     out = dict(split=args.split, n_anchor=args.n_anchor, reps_per_env=reps, env_seeds=split["env_seeds"],
                grid={k: [list(v) if isinstance(v, tuple) else v for v in vs] for k, vs in grid.items()}, cells={})
     with ProcessPoolExecutor() as pool:
-        for regime_name, intensity in cells:
+        for regime_name, intensity, misspec in cells:
             n_env = len(split["env_seeds"])
             truth = dict(zip(split["env_seeds"], pool.map(truths_for, [regime_name] * n_env, [intensity] * n_env,
-                                                           split["env_seeds"], [dataset] * n_env)))
-            jobs = [(regime_name, intensity, e, start + s, args.n_anchor, truth[e], grid, dataset)
+                                                           split["env_seeds"], [dataset] * n_env, [misspec] * n_env)))
+            jobs = [(regime_name, intensity, e, start + s, args.n_anchor, truth[e], grid, dataset, misspec)
                     for e in split["env_seeds"] for s in range(reps)]
             results = list(pool.map(run_one, jobs))
-            key = f"{regime_name}@{intensity}"
+            key = cell_key(regime_name, intensity, misspec)
             out["cells"][key] = dict(
                 truths={str(e): [t[0] for t in truth[e]] for e in split["env_seeds"]},
                 env_of_rep=[j[2] for j in jobs], reps=results)
