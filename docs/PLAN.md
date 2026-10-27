@@ -413,3 +413,23 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    method gets the linear numbers in well-specified cells and the rff32 numbers under
    misspecification: v1 max ratio 1.57 (S4#m3), v2 1.55. The v2 robustness bar (<= 1.5) would
    still fail narrowly on dev. Decision on v3 pending with the user.
+31. **v3 dev round (2026-10-27): novelty evidence + S4#m3 (user: "lets do b again", "support novelty").**
+   - Prior-art check: COPE (Natsubori, Ushiku & Saito, ICLR 2025) is the closest method: target
+     cluster of source domains chosen by |rbar_k - rbar_T| (mechanism-blind), multiple importance
+     weighting within the cluster, regression for domain-specific effects; out-of-cluster data
+     discarded. Also new for related work: Chandak et al. 2022 (OPEN), Shimizu et al. 2025 (OPFV).
+   - Added: COPE baseline (windows = domains, anchor = target domain, size grid {2,4,7,13});
+     grouping ablation (same O-DRIFT pipeline, segmentation statistic replaced by per-action raw
+     reward or overall raw reward = COPE's statistic); per-episode basis selection (PLAN 30);
+     notes on the monitor's invariance (docs/notes_monitor_invariance.md).
+   - S4#m3 diagnosis with rff32 (32 episodes): own-DM bias of old segments +13, corrected -10:
+     the correction overshoots. Prototype (scripts/11_proto_offset_dev.py, 12 seeds x 4 envs):
+     shrinking the segment offsets (offset_scale s; L2 x 1/s^2) -- mean log RMSE s=1 2.009,
+     0.5 1.977, 0.25 1.940, 0.1 1.981, per-cell best baseline 2.010. s=0.25: S4#m3 10.5 vs best
+     baseline 10.9; S4 8.8 vs 11.7; S3a 6.5 vs 7.6; S3b 9.1 vs 8.2. Added as the odrift3 family
+     (grid {1, 0.5, 0.25, 0.1}), tuned on dev3. Read: ridge prior on drift size = partial pooling
+     between corrected and uncorrected reuse.
+   - Smoke (3 seeds x 4 envs): in S2 the blind statistics split into 2-3 segments (O-DRIFT 1):
+     RMSE 7.2-7.4 vs 5.7 -- the mechanism claim in miniature.
+   - Full dev3 running (results/03_dev3.json). Test3/obd3 (test2/real2 seeds) only after the
+     user approves the v3 pre-registration (protocol v3.status -> FROZEN).
