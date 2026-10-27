@@ -356,3 +356,20 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    S0#m3 1.01, S3a#m3 0.88* (6.36 / 6.45), S4#m3 2.05 (36.0 / 22.3; tbdecay 10.9).
    The misspec-3 simulator reproduces the OBD failure only for gradual drift (S4), not for S3a.
    v2 cuts S4#m3 error by 38% but still loses about 2x, and costs about 20% in S4 at misspec 0.5.
+28. **Dev iteration after dev2 (2026-10-27, user chose to iterate; dev seeds only;
+   scripts/08_diag_s4_dev.py, scripts/08_proto_v2_dev.py)**. S4 (not gradual drift: old third has a
+   reward shift under exploratory logger A, middle third a context shift, newest third a poorly
+   exploring logger) at misspec 3, 32 episodes:
+   - The drift correction overshoots: the old segment's bias goes from +12.7e-3 uncorrected to
+     -30 to -40e-3 corrected. v1 gives it most of the weight because it is the most precise.
+   - The reference segment is noisy (ESS ~740 out of 40k, sd ~21e-3) because its loggers barely
+     explore, so validating against it cannot separate a -37e-3 bias from noise.
+   - 10/32 episodes split the stable middle third from the newest (a false split caused by
+     misspecification under context shift).
+   Prototype "both": each old segment enters corrected and uncorrected, weighted by the
+   reference-validated MSE (covariance now accounts for the shared correction data). On 48
+   episodes per cell, S4#m3: v1 34.3, v2(0.5) 21.8, both(0.5) 19.3, best baseline 11.7 (tbdecay).
+   S4 at misspec 0.5: v1 10.1, v2 14.1, both 15.1. Mean log over cells: v1 2.100, v2 2.084,
+   both 2.095, per-cell best baseline 2.041.
+   Conclusion: no reuse variant gets below about 19-20 in S4#m3, the floor set by the reference
+   noise. tbdecay wins there through its decay prior, not through validation.

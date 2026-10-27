@@ -191,13 +191,20 @@ def covariance(components: list) -> np.ndarray:
     """Cross-component covariance of the estimates.
 
     DM parts share the target-context sample, so they covary; correction
-    parts use disjoint logged data and are independent.
+    parts use disjoint logged data and are independent, unless two components
+    share the same correction scores (same data, different DM term).
     """
     dm = np.array([c.dm_scores for c in components])
     M = dm.shape[1]
     S = np.cov(dm) / M if len(components) > 1 else np.array([[dm.var(ddof=1) / M]])
     S = np.atleast_2d(S)
-    S[np.diag_indices_from(S)] += [c.corr_scores.var(ddof=1) / len(c.corr_scores) for c in components]
+    corr_var = [c.corr_scores.var(ddof=1) / len(c.corr_scores) for c in components]
+    S[np.diag_indices_from(S)] += corr_var
+    for i in range(len(components)):  # components built on the same logged data share their correction part
+        for j in range(i + 1, len(components)):
+            if components[i].corr_scores is components[j].corr_scores:
+                S[i, j] += corr_var[i]
+                S[j, i] += corr_var[i]
     return S
 
 
@@ -433,6 +440,7 @@ class ODriftConfig:
     model_anchor: bool = False    # joint fit only: anchor records join the newest segment at t = 1, so the
                                   # target-time prediction is interpolated, not extrapolated
     anchor_sn: bool = False      # self-normalized DR for the anchor component
+    reuse_both: bool = False     # v2 dev candidate: non-reference segments also enter uncorrected (own-model DM)
     reuse_lam: float = 0.0       # v2 reference-validated reuse: > 0 = debiased-MSE weights over balanced segment
                                  # components, bias measured against reference segment + anchor; 0 = v1 pooling
     delta_variance: float = 0.025
@@ -841,12 +849,16 @@ def balanced_segment_components(history: list, anchor: LoggedData, X_target: np.
         p_src = pi.probs(data.X)
         W = p_src[np.arange(N), data.A] / denom
         corr = W * (data.R - q_src[np.arange(N), data.A])
-        dm = dm_ref if (reference_segment is not None and seg is not ref) else (pi_t * hist_nuis[ks[0]].q_tgt).sum(axis=1)
+        dm_own = (pi_t * hist_nuis[ks[0]].q_tgt).sum(axis=1)
+        corrected = reference_segment is not None and seg is not ref
+        dm = dm_ref if corrected else dm_own
         diag = diagnose(data, p_src, n_actions, np.ones(N), z_diag, cfg.min_ess)
         diag.reasons = [r for r in diag.reasons if r != "propensity_inconsistent"]  # mixture data: checked per window
         diag.ess = effective_sample_size(W)
-        comps.append(Component(1000 + j, float(dm.mean() + corr.mean()), dm, corr, diag,
-                               members={k: len(history[k]) / N for k in ks}))
+        members = {k: len(history[k]) / N for k in ks}
+        comps.append(Component(1000 + j, float(dm.mean() + corr.mean()), dm, corr, diag, members=members))
+        if corrected and cfg.reuse_both:  # same data, no drift correction (own segment's DM)
+            comps.append(Component(2000 + j, float(dm_own.mean() + corr.mean()), dm_own, corr, diag, members=members))
     anc = None
     if anc_nuis is not None:
         anc = next(c for c in [transported_dr(anchor, X_target, pi, n_actions, len(history), z_diag, cfg.min_ess,
