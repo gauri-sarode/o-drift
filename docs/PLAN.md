@@ -331,3 +331,13 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    reward-model class captures base + drift; on realistic rewards it does not, and the reused
    old windows carry bias that the 1000-row anchor (anchor-only DR RMSE 35.7e-3) cannot
    detect. In-class/low-misspecification simulator results therefore overstate O-DRIFT.
+26. **v2 pre-registration (2026-10-27, user approved before any v2 code or run; protocol `v2`,
+   splits dev2/test2/real2)**. Motivated by item 25, so v2 is a post-hoc revision and must be
+   reported as one. One change: reference-validated reuse. Corrected segment components are
+   weighted by debiased MSE, with bias measured against the reference (reference segment + anchor),
+   not min-variance pooled. Tuned: reuse_lam in {0 (= v1), 0.5, 1, 2, 4}. Fixed at v1's tuned values:
+   monitor 1e-4, z_anchor 5, joint. New simulator setting misspec 3.0, matched to OBD's nonlinear
+   share by rule. dev2 = v1 dev + 3 misspec cells, and every family is re-tuned there (tuned_v2.json).
+   One-shot tests on fresh seeds: test2 (env 500-503) and real2 (OBD env 400-403).
+   Criteria: v1's five go/no-go on test2 at misspec 0.5, plus robustness on the reward-drift cells
+   (misspec 3 + real2): no ratio > 1.5 and ratio <= 1.0 in at least half.

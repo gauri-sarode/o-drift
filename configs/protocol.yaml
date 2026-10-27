@@ -73,6 +73,48 @@ splits:
       # chosen so the noisiest policy's ESS/n (0.07) matches the simulator's noisiest (0.068); overlap-only rule
     report: same tables/breakdowns as test; descriptive only (no go/no-go)
 
+  # ---------------- v2 (pre-registered 2026-10-27, user approved, BEFORE any v2 code or run; PLAN item 26)
+  # v2 was designed after seeing v1 fail on OBD (PLAN 25). misspec_cells use EnvParams misspec = v2.misspec_high.
+  dev2:
+    env_seeds: [0, 1, 2, 3]
+    data_seeds: {start: 0, count: 50}
+    regimes: {S0: [0.0], S1: [1.0], S2: [0.0], S3a: [0.5], S3b: [0.5], S4: [0.5]}
+    misspec_regimes: {S0: [0.0], S3a: [0.5], S4: [0.5]}
+  test2:
+    env_seeds: [500, 501, 502, 503]           # fresh, never used
+    data_seeds: {start: 30000, count: 75}
+    regimes: {S0: [0.0], S1: [0.5, 2.0], S2: [0.0], S3a: [0.25, 1.0], S3b: [0.25, 1.0], S4: [0.25, 1.0],
+              S5: [0.5, 1.0], S6: [0.0], S7: [0.0], S8: [0.5, 1.0], S8b: [1.0]}
+    misspec_regimes: {S0: [0.0], S2: [0.0], S3a: [1.0], S4: [1.0], S5: [1.0], S8: [1.0]}
+  real2:  # same OBD design as splits.real (incl. amendments), fresh env/data seeds, never tuned on
+    regimes: {S0: [0.0], S2: [0.0], S3a: [0.5, 1.0], S4: [0.5, 1.0], S5: [1.0]}
+    env_seeds: [400, 401, 402, 403]
+    data_seeds: {start: 40000, count: 50}
+
+v2:
+  misspec_high: 3.0   # nonlinear share of base-logit variance 0.43 (0.37-0.49 over dev envs) = OBD's 0.41;
+                      # objective matching rule, no results used
+  method: >-
+    reference-validated reuse: balanced segment components as v1; instead of min-variance pooling,
+    weights minimise the debiased MSE with each component's bias measured against the reference
+    (reference segment + anchor, min-variance): d = V - r.V, Cov(d) = P S P^T (existing shrink_select).
+    reuse_lam = 0 is exactly v1.
+  fixed_from_v1: {monitor_alpha: 0.0001, z_anchor: 5.0, joint_segments: true}  # v1 tuned values, not re-tuned
+  reuse_lam_grid: [0.0, 0.5, 1.0, 2.0, 4.0]
+  not_changed: >-
+    reward-model features (no x^2 - it is OBD's generating class); large-anchor reference check (PLAN 24)
+  tuning: >-
+    every family (baselines too) re-tuned on dev2 (all 9 cells) with tuning.selection_rule;
+    written to results/tuned_v2.json (v1 results/tuned.json untouched)
+  go_no_go_v2:
+    - the five go_no_go criteria, unchanged, on test2 misspec-0.5 cells (S6/S7/no-anchor as in v1)
+    - >-
+      robustness, on reward-drift cells at misspec 3.0 (S3a, S4, S5, S8) and real2 (S3a x2, S4 x2, S5):
+      no cell with RMSE ratio to the best tuned baseline > 1.5, and ratio <= 1.0 in >= half of them
+  reporting: >-
+    v1 test + v1 OBD reported as-is (motivation); v2 labelled post-hoc revision; real2 shares
+    the real base reward with real (not fully independent); misspec-3 sim test is independent
+
 tuning:  # dev split only
   lambda_grid: [0.25, 0.5, 1.0, 2.0, 4.0]   # bias-penalty weight ("mse" selector ablation)
   z_group_grid: [2.0, 3.0, 4.0]             # window-homogeneity threshold ("segment" selector)
