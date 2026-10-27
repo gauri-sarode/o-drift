@@ -347,3 +347,12 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    treated as unbiased: `reference_validated_weights`. Unit tests check that a constructed biased
    segment is dropped and that no detectable bias gives the v1 weights. The v1 dev path reproduces
    the stored dev results to 2e-13.
+27. **dev2 results (2026-10-27; results/03_dev2.json, logs/04_dev2.log, tuned_v2.json)**. Tuning rule
+   picks reuse_lam = 0.5 (mean log RMSE -4.854 vs v1 -4.828; flat: 1.0 -4.845, 2.0 -4.835, 4.0 -4.826).
+   Baselines re-tuned on dev2: recent 12, decay 0.9, liu 6, slope 3, magic 1.96, trecent 8, tdecay 0.8,
+   forecast 1, timedr 1, tbdecay 0.8.
+   Ratios of v2 to the best tuned baseline (v1 RMSE / v2 RMSE x1e-3):
+   S0 1.03, S1 0.94*, S2 1.02, S3a 0.86* (6.46 / 6.68), S3b 1.12, S4 1.02 (10.26 / 12.43),
+   S0#m3 1.01, S3a#m3 0.88* (6.36 / 6.45), S4#m3 2.05 (36.0 / 22.3; tbdecay 10.9).
+   The misspec-3 simulator reproduces the OBD failure only for gradual drift (S4), not for S3a.
+   v2 cuts S4#m3 error by 38% but still loses about 2x, and costs about 20% in S4 at misspec 0.5.
