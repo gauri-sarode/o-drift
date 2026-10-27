@@ -1,0 +1,17 @@
+\section{Experimental Setup}\label{sec:setup}
+% Budget: ~1.0 pp.
+% Checklist:
+%  - Simulator regimes (src/odrift/regimes.py): S0 stationary; S1 covariate drift;
+%    S2 logger switches; S3a abrupt reward drift; S3b gradual reward drift;
+%    S4 mixed (worked example); S5 seasonal; S6 wrong logged propensities;
+%    S7 support loss; S8/S8b out-of-class reward drift. Misspecification levels 0.5 / 3.0.
+%  - Semi-synthetic Open Bandit (saito2021open): Men campaign, random policy,
+%    8 PCA contexts, 13 time blocks, base reward fit on real clicks (nonlinear share 0.41).
+%  - Baselines (all tuned on dev with the same rule): pooled/recent/decay DR, min-var,
+%    transport DR, Liu reg-DR, SLOPE, MAGIC, time-aware recent/decay/balanced decay,
+%    forecast, time-DR, anchor-only, balanced DR, monitor-select.
+%  - Protocol: configs/protocol.yaml frozen before tuning; dev-only tuning; test splits run
+%    once; v2/v3 amendments pre-registered with dates; report post-hoc findings as such.
+%  - Metrics: RMSE (headline), paired bootstrap CI vs best tuned baseline, coverage,
+%    half-width, policy-selection regret.
+\todo{experimental setup}

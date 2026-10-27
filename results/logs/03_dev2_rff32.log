@@ -1,0 +1,10 @@
+S0@0.0     n=200  best: pooled_dr=0.0054  recent_dr[12]=0.0054  monitor_select_dr=0.0054  balanced_dr=0.0054  slope[3.0]=0.0054  minvar_dr=0.0054
+S1@1.0     n=200  best: odrift[0.0001,5.0,1]=0.0064  odrift2[0.0]=0.0064  odrift2[0.5]=0.0064  odrift2[1.0]=0.0064  odrift2[2.0]=0.0064  odrift2[4.0]=0.0064
+S2@0.0     n=200  best: balanced_dr=0.0051  tbdecay[1.0]=0.0052  tbdecay[0.95]=0.0054  odrift[0.0001,5.0,1]=0.0054  odrift2[0.0]=0.0054  odrift2[0.5]=0.0054
+S3a@0.5    n=200  best: odrift[0.0001,5.0,1]=0.0071  odrift2[0.0]=0.0071  odrift2[0.5]=0.0072  odrift2[1.0]=0.0072  ablate_nobalance[0.0001,5.0,1]=0.0072  odrift2[2.0]=0.0073
+S3b@0.5    n=200  best: timedr[1]=0.0091  oracle=0.0093  tbdecay[0.7]=0.0097  decay_dr[0.7]=0.0097  odrift2[0.5]=0.0098  odrift[0.0001,5.0,1]=0.0098
+S4@0.5     n=200  best: ablate_nobalance[0.0001,5.0,1]=0.0115  odrift[0.0001,5.0,1]=0.0116  odrift2[0.0]=0.0116  tbdecay[0.8]=0.0121  tbdecay[0.9]=0.0126  tbdecay[0.95]=0.0133
+S0@0.0#m3.0 n=200  best: balanced_dr=0.0049  pooled_dr=0.0049  recent_dr[12]=0.0049  monitor_select_dr=0.0049  slope[3.0]=0.0049  minvar_dr=0.0049
+S3a@0.5#m3.0 n=200  best: odrift[0.0001,5.0,1]=0.0067  odrift2[0.0]=0.0067  odrift2[0.5]=0.0067  odrift2[1.0]=0.0068  odrift2[2.0]=0.0068  ablate_nobalance[0.0001,5.0,1]=0.0068
+S4@0.5#m3.0 n=200  best: tbdecay[0.8]=0.0105  tbdecay[0.9]=0.0113  tbdecay[0.95]=0.0123  tbdecay[0.7]=0.0127  oracle=0.0131  balanced_dr=0.0134
+wrote /Users/gauris/dev/o-drift/results/03_dev2_rff32.json

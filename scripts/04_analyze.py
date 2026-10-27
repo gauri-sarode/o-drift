@@ -109,10 +109,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--split", choices=["dev", "test", "dev2", "test2", "obd2"], required=True)
     ap.add_argument("--file", default=None)
+    ap.add_argument("--tuned", default=None, help="tuned-parameter file (default by split version)")
     args = ap.parse_args()
     data = json.loads((ROOT / (args.file or f"results/03_{args.split}.json")).read_text())
     v2 = args.split.endswith("2")
-    tuned_path = ROOT / ("results/tuned_v2.json" if v2 else "results/tuned.json")
+    tuned_path = ROOT / (args.tuned or ("results/tuned_v2.json" if v2 else "results/tuned.json"))
 
     if args.split.startswith("dev"):
         tuned, report = tune(data)

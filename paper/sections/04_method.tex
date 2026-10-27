@@ -1,0 +1,18 @@
+\section{Method}\label{sec:method}
+% Budget: ~2.5 pp. Algorithm box recommended (saves space).
+% Components as implemented (src/odrift/method.py); v3 decision PENDING (basis, reuse rule):
+%  1. Segmentation by a reward-drift monitor: per-action residual chi^2 test of the
+%     pooled reward model across windows, alpha = 1e-4 (tuned on dev).
+%  2. Joint segment reward models: shared base + per-segment offsets; cross-fitted
+%     per-action L2 logistic regression (exact per-action decomposition).
+%     PENDING: linear features vs random Fourier features (rahimi2007random), D = 32
+%     chosen by held-out log-loss rule, shared by all methods incl. baselines.
+%  3. Reference segment: newest segment the anchor does not contradict (z_anchor = 5).
+%  4. Within-segment balanced (mixture-propensity) weights.
+%  5. Drift-corrected reuse of older segments (segment offset correction).
+%  6. Min-variance pooling of segment estimates + anchor; covariance includes shared
+%     correction terms.
+%  7. Interval: DerSimonian--Laird random-effects (dersimonian1986meta).
+%  Formal results (to confirm what is stated/proved): unbiasedness of transported DR
+%  under no reward drift; interval validity conditions.
+\todo{method}
