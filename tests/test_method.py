@@ -236,3 +236,18 @@ def test_reuse_lam_zero_is_v1():
                          nuis, segs, fns)
     assert r1.value == r2.value and r1.weights == r2.weights
     assert abs(sum(r3.weights.values()) - 1) < 1e-6 and set(r3.weights) == set(range(regime.n_windows + 1))
+
+
+def test_rff_basis_block_logits_match_features():
+    from odrift.nuisance import _features, basis_dim, block_logits, set_basis
+    rng = np.random.default_rng(0)
+    try:
+        set_basis("rff", 16, 0)
+        X, A = rng.normal(size=(50, 5)), 4
+        assert basis_dim(5) == 21
+        coef = rng.normal(size=A * (1 + basis_dim(5)))
+        L = block_logits(X, coef, A)
+        for a in range(A):
+            assert np.allclose(_features(X, np.full(50, a), A) @ coef, L[:, a])
+    finally:
+        set_basis("linear")

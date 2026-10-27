@@ -373,3 +373,20 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    both 2.095, per-cell best baseline 2.041.
    Conclusion: no reuse variant gets below about 19-20 in S4#m3, the floor set by the reference
    noise. tbdecay wins there through its decay prior, not through validation.
+29. **Flexible reward model for every method (2026-10-27, user request; dev only so far)**.
+   - `nuisance.set_basis`: one context basis shared by every reward model (all estimators and
+     baselines; the monitor keeps its quadratic model). Linear (as before) or random Fourier
+     features phi(x) = [x, sqrt(2) cos(x Omega + b)]: D features, Gaussian-kernel bandwidth
+     sqrt(d), with a fixed Omega and b. RFF is a generic smooth basis, deliberately not the
+     [x, x^2] class that generates OBD.
+   - Basis rule (method-agnostic, on nuisance quality): the smallest D within 0.1% of the best
+     cross-fitted log-loss on dev2 episodes (scripts/09_basis_logloss_dev.py, 4 episodes per
+     env and cell). Mean log-loss: linear 0.5718, rff16 0.5603, rff32 0.5552, rff64 0.5549,
+     so rff32. Misspec 3: 0.607 -> 0.565; misspec 0.5: 0.535 -> 0.539 (slight overfit).
+   - Engineering: `fit_per_action`. The penalised per-action logistic objective separates by
+     action exactly, so every reward model (plain, joint-segment, time-aware) is now fit
+     action by action at tol 1e-8. The old single big fits stopped at tol 1e-4, with
+     coefficient errors of 7.6e-3 (plain) and 0.2 (time-aware). New fits are within 3e-7 /
+     5e-5 of a tightly converged big fit. Estimates therefore shift slightly vs the stored
+     v1 dev (median 2e-4, max 2e-3 for timedr): optimization error of the OLD fits.
+   - The comparison is linear vs rff32 dev2, both with the new fits; every family is re-tuned.

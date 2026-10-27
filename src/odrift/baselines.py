@@ -173,32 +173,27 @@ def forecast_value(comps: list, S: np.ndarray, K: int, degree: int) -> tuple:
     return float(phi_t @ beta), float(np.sqrt(max(phi_t @ cov @ phi_t, 0.0)))
 
 
-def _time_features(X: np.ndarray, A: np.ndarray, t: np.ndarray, n_actions: int, degree: int) -> np.ndarray:
-    """[onehot(a), x*onehot(a)] interacted with (1, t, ..., t^degree)."""
-    onehot = np.eye(n_actions)[A]
-    base = np.hstack([onehot, (X[:, :, None] * onehot[:, None, :]).reshape(len(A), -1)])
-    return np.hstack([base * (t ** p)[:, None] for p in range(degree + 1)])
-
-
 def fit_time_reward(data: LoggedData, K: int, X_target: np.ndarray, n_actions: int, degree: int,
                     seed: int = 0) -> tuple:
-    """Cross-fitted time-aware reward model q(x, a, t), t = window/K (policy-independent).
+    """Cross-fitted time-aware reward model q(x, a, t), t = window/K (policy-independent):
+    per-action features [onehot(a), phi(x) onehot(a)] interacted with (1, t, ..., t^degree).
 
     Returns (out-of-fold q at each record's own (x, a, t), fold-averaged q(x*, ., 1) on
     the target contexts, shape (M, A))."""
-    from sklearn.linear_model import LogisticRegression
+    from scipy.special import expit
+    from .nuisance import basis_dim, block_logits, fit_per_action
     t = data.window / K
     folds = np.random.default_rng(seed).permutation(len(data)) % 2
-    M = len(X_target)
+    M, P = len(X_target), n_actions * (1 + basis_dim(data.X.shape[1]))
     q_own, q_tgt = np.empty(len(data)), np.zeros((M, n_actions))
-    F_tgt = _time_features(np.tile(X_target, (n_actions, 1)), np.repeat(np.arange(n_actions), M),
-                           np.ones(n_actions * M), n_actions, degree)
+    powers = lambda tt: np.column_stack([tt ** p for p in range(degree + 1)])
     for f in range(2):
         tr = folds != f
-        model = LogisticRegression(C=1.0, max_iter=2000, fit_intercept=False)
-        model.fit(_time_features(data.X[tr], data.A[tr], t[tr], n_actions, degree), data.R[tr])
-        q_own[~tr] = model.predict_proba(_time_features(data.X[~tr], data.A[~tr], t[~tr], n_actions, degree))[:, 1]
-        q_tgt += model.predict_proba(F_tgt)[:, 1].reshape(n_actions, M).T / 2
+        coef = fit_per_action(data.X[tr], data.A[tr], data.R[tr], n_actions, powers(t[tr]), C=1.0, max_iter=2000)
+        blk = [coef[i * P:(i + 1) * P] for i in range(degree + 1)]
+        L_own = sum((t[~tr] ** p)[:, None] * block_logits(data.X[~tr], blk[p], n_actions) for p in range(degree + 1))
+        q_own[~tr] = expit(L_own[np.arange((~tr).sum()), data.A[~tr]])
+        q_tgt += expit(sum(block_logits(X_target, b, n_actions) for b in blk)) / 2  # t = 1
     return q_own, q_tgt
 
 

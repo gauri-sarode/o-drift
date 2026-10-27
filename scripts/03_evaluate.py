@@ -27,7 +27,7 @@ from odrift.method import (ODriftConfig, build_components, combine, covariance, 
                            make_corrected_split, odrift_balanced, ratio_function, odrift_corrected, odrift_corrected_split,
                            select_weights)
 from odrift.monitor import ResidualStats, reward_changepoints
-from odrift.nuisance import RewardModel, crossfit_rewards
+from odrift.nuisance import RewardModel, crossfit_rewards, set_basis
 from odrift.regimes import REGIMES
 from odrift.simulator import EnvParams, LoggedData, Policy, mu, sample_episode, true_value
 
@@ -105,6 +105,7 @@ def method_grid(split, tuned):
 
 def run_one(args):
     regime_name, intensity, env_seed, data_seed, n_anchor, truths, grid, dataset, misspec = args
+    set_basis(*grid.get("basis", ("linear", 0)))  # context basis of every reward model (not the monitor)
     env = make_env(env_seed, dataset, misspec)
     regime = REGIMES[regime_name](intensity, K=SIM["n_windows"])
     pis = policies(env, env_seed)
@@ -309,6 +310,7 @@ def main():
     ap.add_argument("--reps", type=int, default=None, help="data seeds per env seed")
     ap.add_argument("--cells", nargs="*", default=None)
     ap.add_argument("--n-anchor", type=int, default=SIM["n_anchor_default"])
+    ap.add_argument("--basis", default="linear:0", help="reward-model context basis, e.g. rff:32")
     ap.add_argument("--out", default=None, help="output path (default results/03_{split}[_anchorN].json)")
     args = ap.parse_args()
     dataset = "obd" if args.split.startswith("obd") else "sim"
@@ -319,6 +321,8 @@ def main():
         assert PROTOCOL["status"] == "FROZEN", "protocol must be frozen before touching test"
         tuned = json.loads((ROOT / ("results/tuned_v2.json" if v2 else "results/tuned.json")).read_text())
     grid = method_grid(("test2" if v2 else "test") if dataset == "obd" else args.split, tuned)
+    kind, D = args.basis.split(":")
+    grid["basis"] = (kind, int(D))
     cells = [(r, i, None) for r, ints in split["regimes"].items() for i in ints]
     cells += [(r, i, V2["misspec_high"]) for r, ints in split.get("misspec_regimes", {}).items() for i in ints]
     if args.cells:

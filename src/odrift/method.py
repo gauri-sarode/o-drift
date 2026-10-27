@@ -508,8 +508,7 @@ def _joint_segment_nuisances(history: list, X_target: np.ndarray, n_actions: int
     then share the base's misspecification error, so the drift estimate q_ref - q_old used
     by drift-corrected reuse is the offset alone rather than a difference of two separately
     misspecified fits on different context distributions."""
-    from sklearn.linear_model import LogisticRegression
-    from .nuisance import _features
+    from .nuisance import fit_per_action
     seg_of = {k: j for j, seg in enumerate(segments) for k in seg}
     if anchor is not None:  # anchor (window index K) is fit as part of the newest segment
         seg_of[len(history)] = 0
@@ -519,20 +518,21 @@ def _joint_segment_nuisances(history: list, X_target: np.ndarray, n_actions: int
 
     t_all = pooled.window / len(history)  # target / anchor time = 1
 
-    def feats(X, A, s_ids, t):
-        base = _features(X, A, n_actions)
-        cols = [base] + [base * (s_ids == j)[:, None] for j in range(1, J)]
+    def mult(s_ids, t):
+        """Block multipliers: base, per-segment offsets (j >= 1), optional trend blocks."""
+        cols = [np.ones(len(s_ids))] + [(s_ids == j).astype(float) for j in range(1, J)]
         if cfg.segment_trend == "segment":  # within-segment drift linear in time (gradual drift)
-            cols += [base * ((s_ids == j) * t)[:, None] for j in range(J)]
+            cols += [(s_ids == j) * t for j in range(J)]
         elif cfg.segment_trend == "shared":  # one slope, identified within segments (offsets absorb levels)
-            cols += [base * t[:, None]]
+            cols += [t]
         elif cfg.segment_trend:
             raise ValueError(cfg.segment_trend)
-        return np.hstack(cols)
+        return np.column_stack(cols)
 
     from scipy.special import expit
     from .nuisance import block_logits
-    P = n_actions * (1 + X_target.shape[1])  # coefficients per feature block (same layout as _features)
+    from .nuisance import basis_dim
+    P = n_actions * (1 + basis_dim(X_target.shape[1]))  # coefficients per feature block (layout of _features)
 
     def logits(coef, X, s_ids, t):
         """All-action logits of the fitted joint model, block by block (no feature materialization)."""
@@ -552,9 +552,9 @@ def _joint_segment_nuisances(history: list, X_target: np.ndarray, n_actions: int
     q_tgt = np.zeros((J, M, n_actions))
     for f in range(2):
         tr = folds != f
-        model = LogisticRegression(C=1.0, max_iter=3000, fit_intercept=False)
-        model.fit(feats(pooled.X[tr], pooled.A[tr], sid[tr], t_all[tr]), pooled.R[tr])
-        coef, te = model.coef_.ravel(), np.where(~tr)[0]
+        coef = fit_per_action(pooled.X[tr], pooled.A[tr], pooled.R[tr], n_actions, mult(sid[tr], t_all[tr]),
+                              C=1.0, max_iter=3000)
+        te = np.where(~tr)[0]
         q_src[te] = expit(logits(coef, pooled.X[te], sid[te], t_all[te]))
         for j in range(J):
             q_tgt[j] += expit(logits(coef, X_target, np.full(M, j), np.ones(M))) / 2
