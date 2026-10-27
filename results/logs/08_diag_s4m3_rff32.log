@@ -1,0 +1,11 @@
+segmentations: [('[[4, 5, 6, 7, 8, 9, 10, 11], [0, 1, 2, 3]]', 22), ('[[8, 9, 10, 11], [4, 5, 6, 7], [0, 1, 2, 3]]', 10)]
+refs: [('[4, 5, 6, 7, 8, 9, 10, 11]', 22), ('[8, 9, 10, 11]', 10)]
+O-DRIFT rmse 13.2 bias -7.9
+seg 0: n=116 corrected bias +5.8 rmse 25.7 (model sd 18.7, ess 741) | own-DM bias +5.8
+seg 1: n=128 corrected bias -9.9 rmse 18.1 (model sd 11.9, ess 2023) | own-DM bias +13.2
+seg 2: n=40 corrected bias -11.6 rmse 19.1 (model sd 8.5, ess 2361) | own-DM bias +13.6
+anchor bias +7.4 rmse 36.1
+env 0: rmse 15.7 bias by policy [ -1.7  -9.3 -10.9  -6. ]
+env 1: rmse 13.1 bias by policy [ -2.2  -9.4 -11.8 -12.2]
+env 2: rmse 12.5 bias by policy [-6.9 -7.8 -7.7 -9.1]
+env 3: rmse 10.8 bias by policy [-10.4 -10.3  -6.4  -3.8]

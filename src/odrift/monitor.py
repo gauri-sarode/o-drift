@@ -23,14 +23,29 @@ def _quad_features(X: np.ndarray, A: np.ndarray, n_actions: int) -> np.ndarray:
 
 
 class ResidualStats:
-    """Per-(window, action) residual sums and variance sums from a pooled model."""
+    """Per-(window, action) residual sums and variance sums from a pooled model.
 
-    def __init__(self, history: list, n_actions: int, C: float = 1.0):
+    kind (grouping ablation, PLAN 31): "residual" is the monitor (per-action residuals of the
+    pooled quadratic model: invariant to context and logger drift under correct specification).
+    The mechanism-blind statistics keep the same test and segmentation: "action" compares
+    per-action raw mean rewards (accounts for logger drift, not context drift); "mean" compares
+    the raw mean reward over all actions (1 df; COPE's similarity statistic).
+    """
+
+    def __init__(self, history: list, n_actions: int, C: float = 1.0, kind: str = "residual"):
         pooled = LoggedData.concat(history)
-        model = LogisticRegression(C=C, max_iter=2000, fit_intercept=False)
-        F = _quad_features(pooled.X, pooled.A, n_actions)
-        model.fit(F, pooled.R)
-        p = model.predict_proba(F)[:, 1]
+        if kind == "residual":
+            model = LogisticRegression(C=C, max_iter=2000, fit_intercept=False)
+            F = _quad_features(pooled.X, pooled.A, n_actions)
+            model.fit(F, pooled.R)
+            p = model.predict_proba(F)[:, 1]
+        elif kind == "action":
+            p = (np.bincount(pooled.A, pooled.R, n_actions) / np.maximum(np.bincount(pooled.A, minlength=n_actions), 1))[pooled.A]
+        elif kind == "mean":
+            p = np.full(len(pooled), pooled.R.mean())
+        else:
+            raise ValueError(kind)
+        self.pool_actions = kind == "mean"
         resid, var = pooled.R - p, p * (1 - p)
         K = len(history)
         self.sum = np.zeros((K, n_actions))
@@ -42,11 +57,15 @@ class ResidualStats:
 
     def block_stat(self, left: list, right: list) -> tuple:
         """Chi-square statistic for equal per-action mean residuals in two blocks."""
+        S1, S2 = self.sum[left].sum(0), self.sum[right].sum(0)
+        V1, V2 = self.var[left].sum(0), self.var[right].sum(0)
         n1, n2 = self.n[left].sum(0), self.n[right].sum(0)
+        if self.pool_actions:
+            S1, S2, V1, V2, n1, n2 = (np.atleast_1d(a.sum()) for a in (S1, S2, V1, V2, n1, n2))
         ok = (n1 > 10) & (n2 > 10)
-        m1 = self.sum[left].sum(0)[ok] / n1[ok]
-        m2 = self.sum[right].sum(0)[ok] / n2[ok]
-        v = self.var[left].sum(0)[ok] / n1[ok] ** 2 + self.var[right].sum(0)[ok] / n2[ok] ** 2
+        m1 = S1[ok] / n1[ok]
+        m2 = S2[ok] / n2[ok]
+        v = V1[ok] / n1[ok] ** 2 + V2[ok] / n2[ok] ** 2
         return float(((m1 - m2) ** 2 / v).sum()), int(ok.sum())
 
 

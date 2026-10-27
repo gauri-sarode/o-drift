@@ -435,6 +435,7 @@ class ODriftConfig:
     context_alpha: float = 0.0   # > 0: density-ratio transport only for windows whose context-shift test rejects
     balanced: bool = False       # pool each reward segment with balanced (mixture) propensities
     joint_segments: bool = False  # segment reward models: one joint fit (shared base + per-segment offsets)
+    offset_scale: float = 1.0     # joint fit only: segment-offset multiplier scale; < 1 = stronger L2 on offsets
     segment_trend: str = ""       # joint fit only: "" none | "segment" per-segment slope | "shared" one
                                   # within-segment slope common to all segments; evaluated at the target time
     model_anchor: bool = False    # joint fit only: anchor records join the newest segment at t = 1, so the
@@ -520,7 +521,7 @@ def _joint_segment_nuisances(history: list, X_target: np.ndarray, n_actions: int
 
     def mult(s_ids, t):
         """Block multipliers: base, per-segment offsets (j >= 1), optional trend blocks."""
-        cols = [np.ones(len(s_ids))] + [(s_ids == j).astype(float) for j in range(1, J)]
+        cols = [np.ones(len(s_ids))] + [cfg.offset_scale * (s_ids == j) for j in range(1, J)]
         if cfg.segment_trend == "segment":  # within-segment drift linear in time (gradual drift)
             cols += [(s_ids == j) * t for j in range(J)]
         elif cfg.segment_trend == "shared":  # one slope, identified within segments (offsets absorb levels)
@@ -539,7 +540,7 @@ def _joint_segment_nuisances(history: list, X_target: np.ndarray, n_actions: int
         blk = [coef[i * P:(i + 1) * P] for i in range(len(coef) // P)]
         L = block_logits(X, blk[0], n_actions)
         for j in range(1, J):
-            L = L + (s_ids == j)[:, None] * block_logits(X, blk[j], n_actions)
+            L = L + cfg.offset_scale * (s_ids == j)[:, None] * block_logits(X, blk[j], n_actions)
         if cfg.segment_trend == "segment":
             for j in range(J):
                 L = L + ((s_ids == j) * t)[:, None] * block_logits(X, blk[J + j], n_actions)

@@ -34,7 +34,9 @@ from odrift.simulator import EnvParams, LoggedData, Policy, mu, sample_episode, 
 ROOT = Path(__file__).resolve().parents[1]
 PROTOCOL = yaml.safe_load((ROOT / "configs/protocol.yaml").read_text())
 SIM, TUNE, V2 = PROTOCOL["simulator"], PROTOCOL["tuning"], PROTOCOL["v2"]
-SPLIT_KEY = {"dev": "dev", "test": "test", "obd": "real", "dev2": "dev2", "test2": "test2", "obd2": "real2"}
+SPLIT_KEY = {"dev": "dev", "test": "test", "obd": "real", "dev2": "dev2", "test2": "test2", "obd2": "real2",
+             "dev3": "dev2", "test3": "test2", "obd3": "real2"}  # v3 reuses the v2 seeds (test2/real2 never run)
+V3 = PROTOCOL["v3"]
 CFG = ODriftConfig(delta_variance=TUNE["delta_split"]["variance"], delta_bias=TUNE["delta_split"]["bias"],
                    **TUNE["odrift_fixed"])
 Z95 = 1.959964
@@ -92,11 +94,15 @@ def method_grid(split, tuned):
         "timedr": TUNE["baseline_grids"]["time_dr_degree"],
         "tbdecay": TUNE["baseline_grids"]["transport_balanced_decay"],
     }
-    if split in ("dev2", "test2"):  # v2: v1's tuned O-DRIFT kept for comparison + the reuse_lam family
+    if split in ("dev2", "test2", "dev3", "test3"):  # v2: v1's tuned O-DRIFT kept for comparison + the reuse_lam family
         fx = V2["fixed_from_v1"]
         grid["odrift"] = [(fx["monitor_alpha"], fx["z_anchor"], int(fx["joint_segments"]))]
         grid["odrift2"] = V2["reuse_lam_grid"]
-    if split in ("test", "test2"):
+    if split in ("dev3", "test3"):  # v3: COPE baseline + grouping ablation (mechanism-blind statistics)
+        grid["cope"] = V3["cope_size_grid"]
+        grid["odrift3"] = V3["offset_scale_grid"]
+        grid["ogroup"] = [(k, a) for k in V3["grouping_kinds"] for a in TUNE["odrift_grid"]["monitor_alpha"]]
+    if split in ("test", "test2", "test3"):
         full = {k: grid[k] for k in ("recent", "decay")}  # for oracle-tuned upper bounds only
         grid = {fam: [tuple(tuned[fam]) if isinstance(tuned[fam], list) else tuned[fam]] for fam in grid}
         grid.update(full)
@@ -105,11 +111,14 @@ def method_grid(split, tuned):
 
 def run_one(args):
     regime_name, intensity, env_seed, data_seed, n_anchor, truths, grid, dataset, misspec = args
-    set_basis(*grid.get("basis", ("linear", 0)))  # context basis of every reward model (not the monitor)
     env = make_env(env_seed, dataset, misspec)
     regime = REGIMES[regime_name](intensity, K=SIM["n_windows"])
     pis = policies(env, env_seed)
     ep = make_episode(env, regime, n_anchor, data_seed, dataset)
+    basis = tuple(grid.get("basis", ("linear", 0)))
+    if basis[0] == "select":  # v3: per-episode choice between linear and rff{D} by held-out log-loss
+        basis = select_basis(ep.history, env.n_actions, data_seed, basis[1])
+    set_basis(*basis)  # context basis of every reward model (not the monitor)
     K, A = regime.n_windows, env.n_actions
     has_anchor = n_anchor >= CFG.min_anchor
 
@@ -123,6 +132,11 @@ def run_one(args):
     seg_nuis = {(m, j): fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, A,
                                           replace(CFG, joint_segments=bool(j)), data_seed, segments=segments[m])
                 for m in monitor_alphas for j in joints}
+    m1, _, _ = grid["odrift"][0]
+    off_nuis = {o: (seg_nuis[(m1, 1)] if o == 1.0 and (m1, 1) in seg_nuis else
+                    fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, A,
+                                      replace(CFG, joint_segments=True, offset_scale=o), data_seed, segments=segments[m1]))
+                for o in grid.get("odrift3", [])}
     datasets = {"pooled": LoggedData.concat(ep.history + ([ep.anchor] if n_anchor else []))}
     if has_anchor:
         datasets["anchor"] = ep.anchor
@@ -157,6 +171,23 @@ def run_one(args):
         logger_fns_all = logger_fns + [lambda X, a=tgt_art: mu(env, a, X)]
     liu_models = {B: RewardModel(A).fit(LoggedData.concat(ep.history[K - B:])) for B in grid["liu"]} if has_anchor else {}
 
+    # v3: COPE target clusters (policy-independent) and mechanism-blind groupings for the ablation
+    cope_h = {c: bl.cope_cluster(pooled_d, K, c) for c in grid.get("cope", [])} if has_anchor else {}
+    group_segs, group_nuis = {}, {}
+    o3 = grid.get("odrift3", [])
+    abl_off = o3[0] if len(o3) == 1 else 0.25  # test3: tuned singleton; dev3: protocol v3.ablation_offset
+    if has_anchor:
+        for kind, a in grid.get("ogroup", []):
+            if kind not in group_segs:
+                group_segs[kind] = ResidualStats(ep.history, A, kind=kind)
+            segs = reward_changepoints(group_segs[kind], a)
+            key = tuple(tuple(g) for g in segs)
+            if key not in group_nuis:
+                group_nuis[key] = (segs, fit_all_nuisances(ep.history, ep.anchor, ep.target_contexts, A,
+                                                           replace(CFG, joint_segments=True, offset_scale=abl_off),
+                                                           data_seed, segments=segs))
+            group_segs[(kind, a)] = key
+
     rec = {}  # method -> list over policies of (estimate, half_width, extra)
     for p_idx, pi in enumerate(pis):
         v_t, v_k = truths[p_idx]
@@ -180,6 +211,10 @@ def run_one(args):
                 r = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, pi, A,
                                     replace(CFG, z_anchor=za, reuse_lam=lam), seg_nuis[(m, j)], segments[m], logger_fns)
                 put(f"odrift2[{lam}]", r.value, r.half_width, status=r.status)
+            for o, nu in off_nuis.items():
+                r = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, pi, A,
+                                    replace(CFG, z_anchor=za, offset_scale=o), nu, segments[m], logger_fns)
+                put(f"odrift3[{o}]", r.value, r.half_width, status=r.status)
             continue
         e = dr_on("anchor")
         put("anchor_dr", e.value, Z95 * e.se)
@@ -253,6 +288,7 @@ def run_one(args):
             deficient = [k for k, reasons in r.reasons.items() if "target_support" in reasons]
             hw_re = Z95 * (r.se_hetero if r.se_hetero is not None else r.se)
             put(f"odrift[{m},{za},{j}]", r.value, hw_re, hw_narrow=float(Z95 * r.se), hw_certified_bound=float(r.half_width),
+                basis=f"{basis[0]}{basis[1]}",
                 status=r.status, weights=[r.weights.get(k, 0.0) for k in range(K + 1)],
                 deficient=deficient, ineligible=sorted(r.reasons), n_segments=len(segments[m]))
             if (m, za, j) == tuple(grid["odrift"][0]):
@@ -264,6 +300,24 @@ def run_one(args):
                     put(f"odrift2[{lam}]", r.value, Z95 * (r.se_hetero if r.se_hetero is not None else r.se),
                         hw_narrow=float(Z95 * r.se), status=r.status, weights=[r.weights.get(k, 0.0) for k in range(K + 1)],
                         deficient=deficient, n_segments=len(segments[m]))
+        for c_, h_ in cope_h.items():
+            e = bl.window_weighted_balanced_dr(pooled_d, q_pool_own, q_pool_tgt, ep.target_contexts, pi, K, h_,
+                                               logger_fns_all, ratio_fns)
+            put(f"cope[{c_}]", e.value, Z95 * e.se)
+        za_v1 = grid["odrift"][0][1]
+        for kind, a in grid.get("ogroup", []):
+            segs, gn = group_nuis[group_segs[(kind, a)]]
+            r = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, pi, A,
+                                replace(CFG, z_anchor=za_v1, offset_scale=abl_off), gn, segs, logger_fns)
+            put(f"ablate_group[{kind},{a}]", r.value, Z95 * (r.se_hetero if r.se_hetero is not None else r.se),
+                n_segments=len(segs))
+        for o, nu in off_nuis.items():
+            r = odrift_balanced(ep.history, ep.anchor, ep.target_contexts, pi, A, replace(CFG, z_anchor=za_v1, offset_scale=o),
+                                nu, segments[m1], logger_fns)
+            deficient = [k for k, reasons in r.reasons.items() if "target_support" in reasons]
+            put(f"odrift3[{o}]", r.value, Z95 * (r.se_hetero if r.se_hetero is not None else r.se),
+                hw_narrow=float(Z95 * r.se), status=r.status, weights=[r.weights.get(k, 0.0) for k in range(K + 1)],
+                deficient=deficient, n_segments=len(segments[m1]), basis=f"{basis[0]}{basis[1]}")
         # oracle selector: true transfer biases, same components
         keep = [c for c in comps if c.diagnostics.eligible] + [anc]
         b = np.array([v_k[c.index] - v_t for c in keep[:-1]] + [0.0])
@@ -284,6 +338,23 @@ def run_one(args):
                 rec.setdefault(f"odrift_split[{m},{za},{j}]", []).append(
                     dict(est=r.value, err=r.value - v_t, hw=r.half_width))
     return rec
+
+
+def select_basis(history, n_actions, seed, D):
+    """v3 basis rule: fit the pooled per-action reward model on a random half of the history with
+    the linear and the rff{D} basis; keep the one with the lower log-loss on the other half."""
+    data = LoggedData.concat(history)
+    fold = np.random.default_rng(seed).permutation(len(data)) % 2 == 0
+    best = None
+    for b in (("linear", 0), ("rff", D)):
+        set_basis(*b)
+        q = RewardModel(n_actions).fit(data.subset(fold)).predict_all(data.X[~fold])
+        q = np.clip(q[np.arange((~fold).sum()), data.A[~fold]], 1e-12, 1 - 1e-12)
+        r = data.R[~fold]
+        ll = float(-np.mean(r * np.log(q) + (1 - r) * np.log(1 - q)))
+        if best is None or ll < best[0]:
+            best = (ll, b)
+    return best[1]
 
 
 def _val_hw(r):
@@ -315,12 +386,14 @@ def main():
     args = ap.parse_args()
     dataset = "obd" if args.split.startswith("obd") else "sim"
     split = PROTOCOL["splits"][SPLIT_KEY[args.split]]
-    v2 = args.split.endswith("2")
+    ver = args.split[-1] if args.split[-1] in "23" else ""
     tuned = None
-    if args.split in ("test", "obd", "test2", "obd2"):  # frozen config only; OBD is never tuned on
+    if args.split in ("test", "obd", "test2", "obd2", "test3", "obd3"):  # frozen config only; OBD is never tuned on
         assert PROTOCOL["status"] == "FROZEN", "protocol must be frozen before touching test"
-        tuned = json.loads((ROOT / ("results/tuned_v2.json" if v2 else "results/tuned.json")).read_text())
-    grid = method_grid(("test2" if v2 else "test") if dataset == "obd" else args.split, tuned)
+        if ver == "3":
+            assert V3.get("status") == "FROZEN", "v3 must be pre-registered (v3.status FROZEN) before touching test3/obd3"
+        tuned = json.loads((ROOT / f"results/tuned{'_v' + ver if ver else ''}.json").read_text())
+    grid = method_grid(f"test{ver}" if dataset == "obd" else args.split, tuned)
     kind, D = args.basis.split(":")
     grid["basis"] = (kind, int(D))
     cells = [(r, i, None) for r, ints in split["regimes"].items() for i in ints]

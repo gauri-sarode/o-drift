@@ -218,20 +218,42 @@ def transport_balanced_decay_dr(data: LoggedData, q_own: np.ndarray, q_tgt: np.n
     logger_fns / ratio_fns have K + 1 entries (index K = anchor; ratio_fns[k] None = 1).
     gamma = 1 is transport + balanced pooling of everything.
     """
+    return window_weighted_balanced_dr(data, q_own, q_tgt, X_target, pi, K, gamma ** (K - np.arange(K + 1)),
+                                       logger_fns, ratio_fns)
+
+
+def window_weighted_balanced_dr(data: LoggedData, q_own: np.ndarray, q_tgt: np.ndarray, X_target: np.ndarray,
+                                pi, K: int, h_window: np.ndarray, logger_fns: list, ratio_fns: list) -> Estimate:
+    """Transported multiple-importance-weighted DR with per-window weights h_window (length K + 1).
+    Decay weights give tbdecay; 0/1 cluster indicators give COPE (cope_cluster)."""
     N, idx = len(data), np.arange(len(data))
     counts = np.bincount(data.window, minlength=K + 1).astype(float)
-    c = counts * gamma ** (K - np.arange(K + 1))
+    c = counts * h_window
     c /= c.sum()
     denom = np.zeros(N)
     for k in range(K + 1):
-        if counts[k]:
+        if c[k] > 0:
             w_k = ratio_fns[k](data.X) if ratio_fns[k] is not None else 1.0
             denom += c[k] * logger_fns[k](data.X)[idx, data.A] / w_k
-    W = pi.probs(data.X)[idx, data.A] / denom
-    h = gamma ** (K - data.window)
+    keep = h_window[data.window] > 0
+    W = np.zeros(N)
+    W[keep] = pi.probs(data.X[keep])[np.arange(keep.sum()), data.A[keep]] / denom[keep]
+    h = h_window[data.window]
     corr = W * (data.R - q_own[idx, data.A])
     dm = (pi.probs(X_target) * q_tgt).sum(axis=1)
     hn = h / h.sum()
     v = float(dm.mean() + hn @ corr)
     se = float(np.sqrt(dm.var(ddof=1) / len(dm) + ((hn * (corr - hn @ corr)) ** 2).sum()))
     return Estimate(v, se, N)
+
+
+def cope_cluster(data: LoggedData, K: int, size: int) -> np.ndarray:
+    """COPE's target cluster (Natsubori, Ushiku & Saito, ICLR 2025): the target domain (anchor,
+    window K) plus the size - 1 history windows whose empirical mean reward is closest to the
+    target's, |rbar_k - rbar_T| (the heuristic used in their experiments). Returns 0/1 window weights."""
+    rbar = np.array([data.R[data.window == k].mean() if (data.window == k).any() else np.inf for k in range(K + 1)])
+    order = np.argsort(np.abs(rbar[:K] - rbar[K]))
+    h = np.zeros(K + 1)
+    h[K] = 1.0
+    h[order[:max(size - 1, 0)]] = 1.0
+    return h

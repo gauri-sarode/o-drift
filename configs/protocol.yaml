@@ -121,6 +121,34 @@ v2:
     v1 test + v1 OBD reported as-is (motivation); v2 labelled post-hoc revision; real2 shares
     the real base reward with real (not fully independent); misspec-3 sim test is independent
 
+v3:
+  status: DEV  # dev3 in progress; set FROZEN only after the user approves the v3 pre-registration
+  opened: 2026-10-27  # user request: back the novelty claim (COPE, ICLR 2025) + one more dev round on S4#m3
+  seeds: >-
+    dev3 = dev2 seeds and cells; test3 / obd3 = test2 / real2 seeds and cells (never run under v2)
+  basis: >-
+    per episode, fit the pooled per-action reward model on a random half of the history (fold seed =
+    data seed) with the linear and the rff32 basis; keep the lower held-out log-loss; the chosen basis
+    is used by EVERY reward model of every method (the monitor keeps its quadratic model). Rule fixed
+    from PLAN 29-30 before any dev3 run.
+  cope_size_grid: [2, 4, 7, 13]  # COPE (Natsubori et al., ICLR 2025): target cluster size incl. the anchor;
+                                 # cluster = windows with the closest mean reward (their heuristic); 13 = all
+  grouping_kinds: [action, mean]  # ablation: O-DRIFT with a mechanism-blind segmentation statistic
+                                  # (per-action raw rewards / overall raw reward), alpha tuned on the
+                                  # monitor_alpha grid like the monitor was
+  method_families: >-
+    odrift v1 fixed from v1 (monitor 1e-4, z_anchor 5, joint); odrift2 reuse_lam grid as v2; every family
+    re-tuned on dev3 with tuning.selection_rule -> results/tuned_v3.json
+  offset_scale_grid: [1.0, 0.5, 0.25, 0.1]  # odrift3 family: v1 pipeline with segment-offset shrinkage
+                                            # (multiplier scale s: L2 on offsets x 1/s^2); 1.0 = v1. Added after
+                                            # the 48-episode dev prototype (PLAN 31); tuned on dev3 by the rule
+  method_under_test: >-
+    odrift3[tuned offset_scale] (v1 pipeline: monitor 1e-4, z_anchor 5, joint segments, min-variance
+    pooling, DerSimonian-Laird interval; per-episode basis). v1 (s = 1) and odrift2 reported alongside.
+  ablation_offset: >-
+    the grouping ablation uses offset_scale 0.25 on dev3 (to tune its alpha) and the tuned odrift3
+    offset_scale on test3
+
 tuning:  # dev split only
   lambda_grid: [0.25, 0.5, 1.0, 2.0, 4.0]   # bias-penalty weight ("mse" selector ablation)
   z_group_grid: [2.0, 3.0, 4.0]             # window-homogeneity threshold ("segment" selector)

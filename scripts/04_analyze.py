@@ -16,10 +16,10 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-FAMILY = re.compile(r"^(recent_dr|decay_dr|liu_reg|odrift_split|odrift2|odrift|slope|magic|trecent|tdecay|forecast|timedr|tbdecay)\[(.+)\]$")
-FAMILY_KEY = {"recent_dr": "recent", "decay_dr": "decay", "liu_reg": "liu", "odrift": "odrift", "odrift2": "odrift2",
+FAMILY = re.compile(r"^(recent_dr|decay_dr|liu_reg|odrift_split|odrift3|odrift2|odrift|slope|magic|trecent|tdecay|forecast|timedr|tbdecay|cope|ablate_group)\[(.+)\]$")
+FAMILY_KEY = {"recent_dr": "recent", "decay_dr": "decay", "liu_reg": "liu", "odrift": "odrift", "odrift2": "odrift2", "odrift3": "odrift3",
               "slope": "slope", "magic": "magic", "trecent": "trecent", "tdecay": "tdecay",
-              "forecast": "forecast", "timedr": "timedr", "tbdecay": "tbdecay"}
+              "forecast": "forecast", "timedr": "timedr", "tbdecay": "tbdecay", "cope": "cope", "ablate_group": "ogroup"}
 BASELINES = ["pooled_dr", "anchor_dr", "recent_dr", "decay_dr", "minvar_dr", "liu_reg", "transport_dr"]
 
 
@@ -70,8 +70,13 @@ def tune(data):
         means = {s: float(np.mean(v)) for s, v in settings.items()}
         best = min(means, key=means.get)
         report[fam] = dict(sorted(means.items(), key=lambda kv: kv[1]))
-        parsed = [int(x) if x.lstrip("-").isdigit() else float(x) for x in best.split(",")]
-        int_families = {"recent", "liu", "trecent", "forecast", "timedr"}  # window counts; everything else stays float
+        def num(x):
+            try:
+                return int(x) if x.lstrip("-").isdigit() else float(x)
+            except ValueError:
+                return x  # categorical setting (grouping kind)
+        parsed = [num(x) for x in best.split(",")]
+        int_families = {"recent", "liu", "trecent", "forecast", "timedr", "cope"}  # window counts; everything else stays float
         tuned[fam] = parsed if len(parsed) > 1 else (int(parsed[0]) if fam in int_families else parsed[0])
     return tuned, report
 
@@ -107,13 +112,14 @@ def print_table(rows):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--split", choices=["dev", "test", "dev2", "test2", "obd2"], required=True)
+    ap.add_argument("--split", choices=["dev", "test", "dev2", "test2", "obd2", "dev3", "test3", "obd3"], required=True)
     ap.add_argument("--file", default=None)
     ap.add_argument("--tuned", default=None, help="tuned-parameter file (default by split version)")
     args = ap.parse_args()
     data = json.loads((ROOT / (args.file or f"results/03_{args.split}.json")).read_text())
-    v2 = args.split.endswith("2")
-    tuned_path = ROOT / (args.tuned or ("results/tuned_v2.json" if v2 else "results/tuned.json"))
+    ver = args.split[-1] if args.split[-1] in "23" else ""
+    v2 = bool(ver)  # v2 and v3 share the reporting (method under test = odrift2[tuned lam]; lam 0 = v1)
+    tuned_path = ROOT / (args.tuned or f"results/tuned{'_v' + ver if ver else ''}.json")
 
     if args.split.startswith("dev"):
         tuned, report = tune(data)
@@ -130,12 +136,12 @@ def main():
 
     od, ods = name("odrift", "odrift"), name("odrift", "odrift_split")
     od1 = od
-    if v2:  # the method under test is v2; v1 (same fits) is reported alongside
-        od = name("odrift2", "odrift2")
+    if v2:  # the method under test is v2 (v3: odrift3); v1 (same fits) is reported alongside
+        od = name("odrift3", "odrift3") if ver == "3" else name("odrift2", "odrift2")
     tuned_baselines = ["pooled_dr", "anchor_dr", name("recent", "recent_dr"), name("decay", "decay_dr"),
                        "minvar_dr", name("liu", "liu_reg"), "transport_dr"]
     for fam, prefix in (("slope", "slope"), ("magic", "magic"), ("trecent", "trecent"), ("tdecay", "tdecay"),
-                        ("forecast", "forecast"), ("timedr", "timedr"), ("tbdecay", "tbdecay")):
+                        ("forecast", "forecast"), ("timedr", "timedr"), ("tbdecay", "tbdecay"), ("cope", "cope")):
         if fam in tuned:
             tuned_baselines.append(name(fam, prefix))
     tuned_baselines += ["anchor_validated", "balanced_dr", "monitor_select_dr"]
@@ -147,8 +153,9 @@ def main():
                 best_m = min(members, key=lambda m: rmse(cell, m))
                 for r in cell["reps"]:
                     r[f"{fam}_oracletuned"] = r[best_m]
+    ablations = [name("ogroup", "ablate_group")] if "ogroup" in tuned else []
     methods = tuned_baselines + ([od1] if v2 else []) + [od, ods, "recent_dr_oracletuned", "decay_dr_oracletuned",
-                                 "ablate_mse", "ablate_bound", "oracle"]
+                                 "ablate_mse", "ablate_bound"] + ablations + ["oracle"]
     rows = table(data, methods)
     print_table(rows)
 
@@ -189,7 +196,7 @@ def main():
         print(f"  {key:10s} env " + " ".join(f"{x:.2f}" for x in by_env) + " | pol " + " ".join(f"{x:.2f}" for x in by_pol)
               + f" ; bias {eo.mean() * 1e3:+.1f} sd {eo.std() * 1e3:.1f}")
 
-    if args.split in ("test", "test2"):
+    if args.split in ("test", "test2", "test3"):
         go = []
         main_cells = {k: v for k, v in summary.items() if "#m" not in k}  # v2: v1 criteria on misspec-0.5 cells
         full_summary, summary = summary, main_cells
@@ -217,12 +224,12 @@ def main():
         summary = full_summary
         if v2:  # pre-registered robustness criterion (protocol v2.go_no_go_v2)
             robust = {k: summary[k]["ratio"] for k in summary if "#m" in k and k.split("@")[0] in ("S3a", "S4", "S5", "S8")}
-            obd2 = ROOT / "results/04_obd2_summary.json"
+            obd2 = ROOT / f"results/04_obd{ver}_summary.json"
             if obd2.exists():
                 robust.update({f"obd2:{k}": v["ratio"] for k, v in json.loads(obd2.read_text())["summary"].items()
                                if k.split("@")[0] in ("S3a", "S4", "S5")})
             else:
-                go.append(("obd2 summary missing (run 04_analyze --split obd2 first)", False))
+                go.append((f"obd{ver} summary missing (run 04_analyze --split obd{ver} first)", False))
             print("  robustness cells: " + "  ".join(f"{k}={v:.2f}" for k, v in robust.items()))
             go.append((f"robustness: no reward-drift cell (misspec 3 + obd2) ratio > 1.5 (max {max(robust.values()):.2f})",
                        bool(max(robust.values()) <= 1.5)))
@@ -231,8 +238,8 @@ def main():
         for crit, ok in go:
             print(f"  [{'PASS' if ok else 'FAIL'}] {crit}")
         (ROOT / f"results/04_{args.split}_summary.json").write_text(json.dumps(dict(summary=summary, go=go), indent=2))
-    elif args.split == "obd2":
-        (ROOT / "results/04_obd2_summary.json").write_text(json.dumps(dict(summary=summary), indent=2))
+    elif args.split in ("obd2", "obd3"):
+        (ROOT / f"results/04_{args.split}_summary.json").write_text(json.dumps(dict(summary=summary), indent=2))
 
 
 if __name__ == "__main__":

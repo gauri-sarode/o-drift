@@ -9,10 +9,12 @@ from odrift.simulator import EnvParams, Policy, mu, sample_episode, true_value
 
 MS = float(sys.argv[1]) if len(sys.argv) > 1 else 3.0
 RG = sys.argv[2] if len(sys.argv) > 2 else "S4"
+BASIS = (sys.argv[3].split(":")[0], int(sys.argv[3].split(":")[1])) if len(sys.argv) > 3 else ("linear", 0)
 CFG = ODriftConfig(z_anchor=5.0, fallback="least", context_alpha=0.01, joint_segments=True, z_group=3.5)
 
 def one(args):
     e, s = args
+    from odrift.nuisance import set_basis; set_basis(*BASIS)
     env = EnvParams.sample(seed=e, misspec=MS); regime = REGIMES[RG](0.5)
     pis = [Policy.near_optimal(env, noise=n, seed=e) for n in (0.0, 0.5, 1.0, 2.0)]
     fns = [lambda X, sp=sp: mu(env, sp, X) for sp in regime.windows]
@@ -48,6 +50,7 @@ if __name__ == "__main__":
         ob = [q["own"][j] for r in res for q in r if j in q["own"]]
         sd = [q["comp"][j][1] for r in res for q in r if j in q["comp"]]
         ess = [q["comp"][j][2] for r in res for q in r if j in q["comp"]]
+        wt = [np.mean(q["w"][j]) if np.ndim(q["w"][j]) else q["w"][j] for r in res for q in r if j in q["w"]]
         if cb: print(f"seg {j}: n={len(cb)} corrected bias {1e3*np.mean(cb):+.1f} rmse {1e3*np.sqrt(np.mean(np.square(cb))):.1f} (model sd {1e3*np.mean(sd):.1f}, ess {np.mean(ess):.0f}) | own-DM bias {1e3*np.mean(ob):+.1f}")
     a = [q["anc"] for r in res for q in r]; print(f"anchor bias {1e3*np.mean(a):+.1f} rmse {1e3*np.sqrt(np.mean(np.square(a))):.1f}")
     for e in range(4):
