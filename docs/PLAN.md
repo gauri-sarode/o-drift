@@ -390,3 +390,26 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
      5e-5 of a tightly converged big fit. Estimates therefore shift slightly vs the stored
      v1 dev (median 2e-4, max 2e-3 for timedr): optimization error of the OLD fits.
    - The comparison is linear vs rff32 dev2, both with the new fits; every family is re-tuned.
+30. **Linear vs rff32 dev2, both on the new fits (2026-10-27)**. Ratio of O-DRIFT RMSE to
+   the best tuned baseline, v1 / v2(0.5), x = results/04_dev2_{linear,rff32}.log:
+   | cell | linear | rff32 |
+   |---|---|---|
+   | S0 | 1.03/1.03 | 1.06/1.06 |
+   | S1 | 0.94/0.94 | 0.89/0.89 |
+   | S2 | 1.02/1.02 | 1.04/1.04 |
+   | S3a | 0.83/0.86 | 0.91/0.92 |
+   | S3b | 1.12/1.13 | 1.08/1.08 |
+   | S4 | 0.90/1.05 | 0.96/1.11 |
+   | S0#m3 | 1.01/1.01 | 1.06/1.06 |
+   | S3a#m3 | 0.86/0.87 | 0.96/0.96 |
+   | S4#m3 | 3.41/2.08 | 1.57/1.55 |
+   RFF cuts O-DRIFT's S4#m3 RMSE (v1 37.0 -> 16.5, x1e-3) but adds variance in the
+   well-specified cells (S3a 6.47 -> 7.14); baselines barely move (tbdecay S4#m3 10.9 -> 10.5).
+   Tuning: linear picks v2 lam 0.5 (tuned_v3_linear.json), rff32 picks lam 0 = v1
+   (tuned_v3_rff32.json). With the new linear fits v1 is better than v2 everywhere except S4#m3.
+   **Post-hoc dev check (scripts/10_basis_select_dev.py), labeled as such**: choose the basis per
+   episode by cross-fitted log-loss of the pooled reward model (linear vs rff32). It picks linear
+   in 100% of misspec-0.5 episodes and rff32 in 100% of misspec-3 episodes, so the selected
+   method gets the linear numbers in well-specified cells and the rff32 numbers under
+   misspecification: v1 max ratio 1.57 (S4#m3), v2 1.55. The v2 robustness bar (<= 1.5) would
+   still fail narrowly on dev. Decision on v3 pending with the user.
