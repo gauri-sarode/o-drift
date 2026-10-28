@@ -433,3 +433,15 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
      RMSE 7.2-7.4 vs 5.7 -- the mechanism claim in miniature.
    - Full dev3 running (results/03_dev3.json). Test3/obd3 (test2/real2 seeds) only after the
      user approves the v3 pre-registration (protocol v3.status -> FROZEN).
+32. **dev3 (2026-10-28; results/03_dev3.json, tuned_v3.json, logs/04_dev3.log)**. Tuned: odrift3
+   offset_scale 0.25, COPE size 13, blind grouping mean@1e-4. odrift3 / best tuned baseline: S0 1.03,
+   S1 0.99, S2 1.02, S3a 0.83*, S3b 1.19 (CI>0, vs timedr), S4 0.76*, S0#m3 1.06 (CI>0), S3a#m3 0.91*,
+   S4#m3 1.08 (was 1.57 under v2 rff32, 3.41 linear). Dev go/no-go analogues pass. Hetero coverage
+   0.95/0.96/0.94/0.92/0.72/0.92/0.94/0.88/0.82 (S3b gap as before).
+   COPE[13] / odrift3: S3a 2.06, S3b 1.39, S4 1.52, S3a#m3 2.17, S4#m3 1.18; ties without reward drift
+   (13 = all windows, i.e. COPE degenerates to balanced pooling; smaller clusters lose).
+   Grouping ablation (same pipeline, statistic swapped), false-split rate n_seg>1 residual / mean / action:
+   S1 0.00 / 0.31 / 1.00, S2 0.00 / 1.00 / 1.00, S0 0 / 0 / 0. Missed splits in S3a: mean statistic
+   finds the change in 0.76 of episodes vs 1.00. RMSE ablation(mean) / odrift3: S1 1.08, S2 1.27,
+   S3a 1.02, S3b 0.98, S4 0.97, S3a#m3 1.09, S4#m3 1.06. Draft go_no_go_v3 (N1 vs COPE, N2 ablation)
+   written to protocol.yaml for user approval; status still DEV.

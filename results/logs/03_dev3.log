@@ -1,0 +1,10 @@
+S0@0.0     n=200  best: balanced_dr=0.0054  pooled_dr=0.0054  recent_dr[12]=0.0054  monitor_select_dr=0.0054  slope[3.0]=0.0054  minvar_dr=0.0054
+S1@1.0     n=200  best: odrift[0.0001,5.0,1]=0.0062  odrift2[0.0]=0.0062  odrift2[0.5]=0.0062  odrift2[1.0]=0.0062  odrift2[2.0]=0.0062  odrift2[4.0]=0.0062
+S2@0.0     n=200  best: balanced_dr=0.0051  tbdecay[1.0]=0.0052  cope[13]=0.0052  odrift[0.0001,5.0,1]=0.0052  odrift2[0.0]=0.0052  odrift2[0.5]=0.0052
+S3a@0.5    n=200  best: odrift3[0.5]=0.0064  odrift3[0.25]=0.0065  ablate_group[action,0.0001]=0.0065  odrift[0.0001,5.0,1]=0.0065  odrift2[0.0]=0.0065  odrift3[1.0]=0.0065
+S3b@0.5    n=200  best: timedr[1]=0.0083  oracle=0.0087  odrift[0.0001,5.0,1]=0.0092  odrift2[0.0]=0.0092  odrift3[1.0]=0.0092  odrift3[0.5]=0.0093
+S4@0.5     n=200  best: ablate_group[mean,0.0001]=0.0090  ablate_group[mean,0.001]=0.0090  ablate_group[mean,0.01]=0.0091  odrift3[0.25]=0.0092  ablate_group[action,0.001]=0.0103  ablate_group[action,0.0001]=0.0103
+S0@0.0#m3.0 n=200  best: balanced_dr=0.0049  pooled_dr=0.0049  recent_dr[12]=0.0049  monitor_select_dr=0.0049  slope[3.0]=0.0049  minvar_dr=0.0049
+S3a@0.5#m3.0 n=200  best: odrift3[0.1]=0.0064  ablate_group[action,0.001]=0.0064  ablate_group[action,0.0001]=0.0064  odrift3[0.25]=0.0064  ablate_group[action,0.01]=0.0064  odrift3[0.5]=0.0065
+S4@0.5#m3.0 n=200  best: odrift3[0.1]=0.0093  tbdecay[0.8]=0.0105  tbdecay[0.9]=0.0113  odrift3[0.25]=0.0114  ablate_group[mean,0.0001]=0.0122  tbdecay[0.95]=0.0123
+wrote /Users/gauris/dev/o-drift/results/03_dev3.json

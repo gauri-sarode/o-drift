@@ -148,6 +148,24 @@ v3:
   ablation_offset: >-
     the grouping ablation uses offset_scale 0.25 on dev3 (to tune its alpha) and the tuned odrift3
     offset_scale on test3
+  dev3_tuned: >-
+    results/tuned_v3.json (2026-10-28): odrift3 offset_scale 0.25; cope size 13; ablation grouping
+    mean, alpha 1e-4. Baselines as written there.
+  go_no_go_v3:  # DRAFT 2026-10-28, pending user approval; written after dev3, before any test3/obd3 run
+    - the five go_no_go criteria, unchanged, on test3 misspec-0.5 cells (S6/S7/no-anchor as in v1)
+    - the go_no_go_v2 robustness criterion, unchanged, on test3 misspec-3.0 cells and obd3
+    - >-
+      novelty N1 (vs COPE, tuned): O-DRIFT RMSE < COPE with paired 95% CI excluding 0 in >= half of the
+      test3 reward-drift cells (S3a, S3b, S4, S5, S8, S8b; every intensity, misspec 0.5 and 3.0), and <= 1.10 x COPE in S0, S1, S2
+    - >-
+      novelty N2 (mechanism awareness, grouping ablation): false-split rate (n_segments > 1) of the
+      residual monitor <= 0.05 in every no-reward-drift cell (S0, S1, S2), misspec 0.5; the tuned
+      blind grouping's rate reported next to it; the ablation's RMSE exceeds O-DRIFT's with paired CI
+      excluding 0 in S1 or S2; and in no reward-drift cell is the ablation's RMSE <= 0.90 x O-DRIFT
+      with CI excluding 0
+  reporting_v3: >-
+    v1 and v2 dev results reported as development history; misspec-3 false splits (Claim-1 caveat)
+    reported per cell; N1/N2 reported in full even if they fail
 
 tuning:  # dev split only
   lambda_grid: [0.25, 0.5, 1.0, 2.0, 4.0]   # bias-penalty weight ("mse" selector ablation)
