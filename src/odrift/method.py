@@ -395,6 +395,30 @@ def shrink_select(comps: list, S: np.ndarray, cfg, lam: float, groups: list | No
     return select_weights(S, np.zeros(len(comps)), 0.0, Q=mse_objective(S, d, C, lam))
 
 
+def gate_components(comps: list, S: np.ndarray, ref_pos: list, z: float) -> list:
+    """v4 gated reuse (anchor last; ref_pos = reference-segment positions).
+
+    r = (reference segment + anchor) at minimum variance is the yardstick. A non-reference
+    component i is kept only if |V_i - r.V| <= z * sqrt((e_i - r)^T S (e_i - r)), i.e. the
+    reference does not detect its bias at the two-sided level of z. Returns kept positions.
+    """
+    n = len(comps)
+    idx = sorted(set(ref_pos) | {n - 1})
+    r = np.zeros(n)
+    r[idx] = select_weights(S[np.ix_(idx, idx)], np.zeros(len(idx)), 0.0)
+    values = np.array([c.value for c in comps])
+    keep = []
+    for i in range(n):
+        if i in idx:
+            keep.append(i)
+            continue
+        e = -r.copy()
+        e[i] += 1
+        if abs(values[i] - r @ values) <= z * np.sqrt(max(e @ S @ e, 0.0)):
+            keep.append(i)
+    return keep
+
+
 def reference_validated_weights(comps: list, S: np.ndarray, ref_pos: list, lam: float) -> np.ndarray:
     """v2 reference-validated reuse (anchor last; ref_pos = reference-segment positions).
 
@@ -444,6 +468,9 @@ class ODriftConfig:
     reuse_both: bool = False     # v2 dev candidate: non-reference segments also enter uncorrected (own-model DM)
     reuse_lam: float = 0.0       # v2 reference-validated reuse: > 0 = debiased-MSE weights over balanced segment
                                  # components, bias measured against reference segment + anchor; 0 = v1 pooling
+    reuse_gate: float = np.inf   # v4 gated reuse: a corrected non-reference segment is pooled only if its
+                                 # discrepancy from the reference (reference segment + anchor) is within
+                                 # reuse_gate standard errors; inf = v1 pooling (no gate)
     delta_variance: float = 0.025
     delta_bias: float = 0.025
     delta_diagnostics: float = 0.01
@@ -879,7 +906,16 @@ def odrift_balanced(history: list, anchor: LoggedData, X_target: np.ndarray, pi,
     if ref_segment is None or not seg_comps:
         return combine(comps, anc, cfg, window_groups=segments)
     ref_idx = 1000 + next(j for j, seg in enumerate(segments) if seg is ref_segment)
-    if cfg.reuse_lam > 0 and any(c.index == ref_idx for c in seg_comps):
+    if np.isfinite(cfg.reuse_gate) and any(c.index == ref_idx for c in seg_comps):
+        # v4: drop corrected segments whose discrepancy from the reference is detectable
+        elig = [c for c in seg_comps if c.diagnostics.eligible]
+        if any(c.index == ref_idx for c in elig):
+            sel = elig + [anc_c]
+            kept = gate_components(sel, covariance(sel), [j for j, c in enumerate(elig) if c.index == ref_idx],
+                                   cfg.reuse_gate)
+            seg_comps = [sel[j] for j in kept if j < len(elig)]
+        res = combine(seg_comps, anc_c, replace(cfg, **POOL))
+    elif cfg.reuse_lam > 0 and any(c.index == ref_idx for c in seg_comps):
         # v2: the other segments keep weight only as far as their discrepancy from the
         # reference (reference segment + anchor) is explained by noise
         res = combine(seg_comps, anc_c, replace(cfg, selection="refmse"), cfg.reuse_lam, window_groups=[[ref_idx]])

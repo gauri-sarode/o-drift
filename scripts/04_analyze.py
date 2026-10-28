@@ -14,10 +14,11 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-FAMILY = re.compile(r"^(recent_dr|decay_dr|liu_reg|odrift_split|odrift3|odrift2|odrift|slope|magic|trecent|tdecay|forecast|timedr|tbdecay|cope|ablate_group)\[(.+)\]$")
-FAMILY_KEY = {"recent_dr": "recent", "decay_dr": "decay", "liu_reg": "liu", "odrift": "odrift", "odrift2": "odrift2", "odrift3": "odrift3",
+FAMILY = re.compile(r"^(recent_dr|decay_dr|liu_reg|odrift_split|odrift4|odrift3|odrift2|odrift|slope|magic|trecent|tdecay|forecast|timedr|tbdecay|cope|ablate_group)\[(.+)\]$")
+FAMILY_KEY = {"recent_dr": "recent", "decay_dr": "decay", "liu_reg": "liu", "odrift": "odrift", "odrift2": "odrift2", "odrift3": "odrift3", "odrift4": "odrift4",
               "slope": "slope", "magic": "magic", "trecent": "trecent", "tdecay": "tdecay",
               "forecast": "forecast", "timedr": "timedr", "tbdecay": "tbdecay", "cope": "cope", "ablate_group": "ogroup"}
 BASELINES = ["pooled_dr", "anchor_dr", "recent_dr", "decay_dr", "minvar_dr", "liu_reg", "transport_dr"]
@@ -154,12 +155,12 @@ def print_table(rows):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--split", choices=["dev", "test", "dev2", "test2", "obd2", "dev3", "test3", "obd3"], required=True)
+    ap.add_argument("--split", choices=["dev", "test", "dev2", "test2", "obd2", "dev3", "test3", "obd3", "dev4", "test4", "obd4"], required=True)
     ap.add_argument("--file", default=None)
     ap.add_argument("--tuned", default=None, help="tuned-parameter file (default by split version)")
     args = ap.parse_args()
     data = json.loads((ROOT / (args.file or f"results/03_{args.split}.json")).read_text())
-    ver = args.split[-1] if args.split[-1] in "23" else ""
+    ver = args.split[-1] if args.split[-1] in "234" else ""
     v2 = bool(ver)  # v2 and v3 share the reporting (method under test = odrift2[tuned lam]; lam 0 = v1)
     tuned_path = ROOT / (args.tuned or f"results/tuned{'_v' + ver if ver else ''}.json")
 
@@ -167,6 +168,8 @@ def main():
         tuned, report = tune(data)
         for fam, means in report.items():
             print(f"{fam:8s} " + "  ".join(f"{s}:{v:.3f}" for s, v in list(means.items())[:5]))
+        if ver == "4":  # protocol v4.z_gate is fixed a priori, not tuned (the grid is reported only)
+            tuned["odrift4"] = yaml.safe_load((ROOT / "configs/protocol.yaml").read_text())["v4"]["z_gate"]
         tuned_path.write_text(json.dumps(tuned, indent=2))
         print(f"\ntuned: {tuned}  -> {tuned_path.relative_to(ROOT)}")
     else:
@@ -179,7 +182,8 @@ def main():
     od, ods = name("odrift", "odrift"), name("odrift", "odrift_split")
     od1 = od
     if v2:  # the method under test is v2 (v3: odrift3); v1 (same fits) is reported alongside
-        od = name("odrift3", "odrift3") if ver == "3" else name("odrift2", "odrift2")
+        od = {"4": name("odrift4", "odrift4") if "odrift4" in tuned else None,
+              "3": name("odrift3", "odrift3")}.get(ver) or name("odrift2", "odrift2")
     tuned_baselines = ["pooled_dr", "anchor_dr", name("recent", "recent_dr"), name("decay", "decay_dr"),
                        "minvar_dr", name("liu", "liu_reg"), "transport_dr"]
     for fam, prefix in (("slope", "slope"), ("magic", "magic"), ("trecent", "trecent"), ("tdecay", "tdecay"),
@@ -239,7 +243,7 @@ def main():
               + f" ; bias {eo.mean() * 1e3:+.1f} sd {eo.std() * 1e3:.1f}")
 
     novelty = None
-    if ver == "3" and args.split != "obd3":
+    if ver in ("3", "4") and not args.split.startswith("obd"):
         novelty, novelty_rows = novelty_checks(data, od, name("cope", "cope"), name("ogroup", "ablate_group"))
         if args.split == "dev3":
             for crit, ok in novelty:
