@@ -57,6 +57,48 @@ def paired_bootstrap(cell, a, b, n_boot=10_000, seed=0):
     return float(np.sqrt(sa.mean()) - np.sqrt(sb.mean())), float(np.percentile(d, 2.5)), float(np.percentile(d, 97.5))
 
 
+REWARD_DRIFT = ("S3a", "S3b", "S4", "S5", "S8", "S8b")
+NO_REWARD_DRIFT = ("S0", "S1", "S2")
+
+
+def split_rate(cell, method):
+    """Share of replications whose segmentation has more than one segment."""
+    return float(np.mean([r[method][0]["n_segments"] > 1 for r in cell["reps"]]))
+
+
+def novelty_checks(data, od, cope, abl):
+    """Pre-registered v3 criteria N1 (vs tuned COPE) and N2 (grouping ablation); protocol v3.go_no_go_v3."""
+    go, rows = [], {}
+    for key, cell in data["cells"].items():
+        if od not in cell["reps"][0]:
+            continue
+        reg, mis = key.split("@")[0], "#m" in key
+        dc, lo_c, hi_c = paired_bootstrap(cell, od, cope)
+        da, lo_a, hi_a = paired_bootstrap(cell, abl, od)
+        rows[key] = dict(reg=reg, mis=mis, cope_ratio=rmse(cell, od) / rmse(cell, cope), cope_ci=[lo_c, hi_c],
+                         abl_ratio=rmse(cell, abl) / rmse(cell, od), abl_ci=[lo_a, hi_a],
+                         split_od=split_rate(cell, od), split_abl=split_rate(cell, abl))
+    print(f"\nNovelty (v3): O-DRIFT/COPE ({cope}) and ablation ({abl})/O-DRIFT RMSE ratios, paired 95% CI x1e3; "
+          "false-split rate n_seg>1")
+    for key, r in rows.items():
+        print(f"  {key:13s} od/cope {r['cope_ratio']:.2f} [{r['cope_ci'][0] * 1e3:+.2f},{r['cope_ci'][1] * 1e3:+.2f}]   "
+              f"abl/od {r['abl_ratio']:.2f} [{r['abl_ci'][0] * 1e3:+.2f},{r['abl_ci'][1] * 1e3:+.2f}]   "
+              f"split od {r['split_od']:.2f} abl {r['split_abl']:.2f}")
+    drift = [k for k, r in rows.items() if r["reg"] in REWARD_DRIFT]
+    stat = [k for k, r in rows.items() if r["reg"] in NO_REWARD_DRIFT and not r["mis"]]
+    beat = [k for k in drift if rows[k]["cope_ci"][1] < 0]
+    go.append((f"N1: beats COPE (CI<0) in >= half of reward-drift cells ({len(beat)}/{len(drift)})",
+               bool(drift) and 2 * len(beat) >= len(drift)))
+    go.append(("N1: <= 1.10x COPE in S0/S1/S2", bool(stat) and all(rows[k]["cope_ratio"] <= 1.10 for k in stat)))
+    go.append((f"N2: monitor false-split rate <= 0.05 in S0/S1/S2 (max {max(rows[k]['split_od'] for k in stat):.2f})",
+               all(rows[k]["split_od"] <= 0.05 for k in stat)))
+    worse = [k for k in stat if k.split("@")[0] in ("S1", "S2") and rows[k]["abl_ci"][0] > 0]
+    go.append((f"N2: ablation worse than O-DRIFT (CI>0) in S1 or S2 ({worse})", bool(worse)))
+    big = [k for k in drift if rows[k]["abl_ratio"] <= 0.90 and rows[k]["abl_ci"][1] < 0]
+    go.append((f"N2: ablation never <= 0.90x O-DRIFT (CI<0) in reward-drift cells ({big})", not big))
+    return go, rows
+
+
 def tune(data):
     """Family-wise: minimize mean over dev cells of log RMSE."""
     scores = defaultdict(lambda: defaultdict(list))
@@ -196,6 +238,13 @@ def main():
         print(f"  {key:10s} env " + " ".join(f"{x:.2f}" for x in by_env) + " | pol " + " ".join(f"{x:.2f}" for x in by_pol)
               + f" ; bias {eo.mean() * 1e3:+.1f} sd {eo.std() * 1e3:.1f}")
 
+    novelty = None
+    if ver == "3" and args.split != "obd3":
+        novelty, novelty_rows = novelty_checks(data, od, name("cope", "cope"), name("ogroup", "ablate_group"))
+        if args.split == "dev3":
+            for crit, ok in novelty:
+                print(f"  [dev preview {'PASS' if ok else 'FAIL'}] {crit}")
+
     if args.split in ("test", "test2", "test3"):
         go = []
         main_cells = {k: v for k, v in summary.items() if "#m" not in k}  # v2: v1 criteria on misspec-0.5 cells
@@ -235,9 +284,12 @@ def main():
                        bool(max(robust.values()) <= 1.5)))
             n_ok = sum(v <= 1.0 for v in robust.values())
             go.append((f"robustness: ratio <= 1.0 in >= half ({n_ok}/{len(robust)})", bool(2 * n_ok >= len(robust))))
+        if novelty is not None:
+            go += novelty
         for crit, ok in go:
             print(f"  [{'PASS' if ok else 'FAIL'}] {crit}")
-        (ROOT / f"results/04_{args.split}_summary.json").write_text(json.dumps(dict(summary=summary, go=go), indent=2))
+        out = dict(summary=summary, go=go) | (dict(novelty=novelty_rows) if novelty is not None else {})
+        (ROOT / f"results/04_{args.split}_summary.json").write_text(json.dumps(out, indent=2))
     elif args.split in ("obd2", "obd3"):
         (ROOT / f"results/04_{args.split}_summary.json").write_text(json.dumps(dict(summary=summary), indent=2))
 
