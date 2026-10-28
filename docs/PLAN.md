@@ -445,3 +445,18 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    finds the change in 0.76 of episodes vs 1.00. RMSE ablation(mean) / odrift3: S1 1.08, S2 1.27,
    S3a 1.02, S3b 0.98, S4 0.97, S3a#m3 1.09, S4#m3 1.06. Draft go_no_go_v3 (N1 vs COPE, N2 ablation)
    written to protocol.yaml for user approval; status still DEV.
+33. **v3 TEST RESULTS (2026-10-28, one shot, frozen v3; results/03_test3.json, 03_test3_anchor0.json,
+   03_obd3.json, 04_test3_summary.json, 04_obd3_summary.json, logs/04_{test3,obd3}.log)**.
+   Verdict: the five v1 criteria PASS (wins S4@0.25 0.86, S4@1.0 0.65; S0/S1/S2 1.00-1.07; split coverage;
+   S7 1.000; no anchor 1.000). Novelty N1 and N2 PASS: O-DRIFT beats tuned COPE (size 13) in 15/15
+   reward-drift cells (0.19-0.93x), ties without reward drift; monitor false-split rate 0.00 in S0/S1/S2 vs
+   blind grouping 0.22/0.61 (S1) and 0.52 (S2), ablation 1.07-1.13x worse there and never better
+   anywhere (1.01-2.35x in reward-drift cells). Robustness FAILS: misspec-3 sim cells pass (0.98, 0.81,
+   0.80, 0.99) but OBD3 ratios are 3.33 / 7.74 / 3.14 / 6.87 / 3.63 (S3a .5/1, S4 .5/1, S5), all bias
+   (+14 to +68e-3). Other test losses: S3a@1.0 1.40, S3b 1.28 / 3.02 (vs timedr), S7 1.52, S6 1.13;
+   hetero coverage 0.22-0.34 in S5, 0.27 in S3b@1.0.
+   Post-hoc (label as such): basis selection chose linear in every OBD episode; offset shrinkage
+   0.25 is what makes OBD worse than v1 (S3a@1 36.4 vs v1 10.0; S4@1 73.8 vs 31.8): the ridge prior on
+   drift size, tuned on simulator drift, under-corrects OBD's 3x-larger drift. v1 itself still loses
+   (ratios ~1.6-2.4 vs monitor_select_dr). monitor_select_dr (our monitor + newest segment only) is the
+   best OBD method in S3a/S4 (4.7, 13.5).

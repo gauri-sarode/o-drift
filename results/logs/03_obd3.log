@@ -1,0 +1,8 @@
+S0@0.0     n=200  best: cope[13]=0.0031  odrift[0.0001,5.0,1]=0.0032  odrift2[0.0]=0.0032  ablate_group[mean,0.0001]=0.0032  odrift3[0.25]=0.0032  minvar_dr=0.0033
+S2@0.0     n=200  best: odrift[0.0001,5.0,1]=0.0028  odrift2[0.0]=0.0028  odrift3[0.25]=0.0028  ablate_group[mean,0.0001]=0.0028  cope[13]=0.0028  balanced_dr=0.0031
+S3a@0.5    n=200  best: recent_dr[6]=0.0047  monitor_select_dr=0.0047  oracle=0.0053  recent_dr[4]=0.0058  timedr[1]=0.0059  ablate_nobalance[0.0001,5.0,1]=0.0061
+S3a@1.0    n=200  best: recent_dr[6]=0.0047  monitor_select_dr=0.0047  oracle=0.0053  recent_dr[4]=0.0058  timedr[1]=0.0060  recent_dr[3]=0.0064
+S4@0.5     n=200  best: timedr[1]=0.0102  trecent[8]=0.0107  oracle=0.0110  recent_dr[8]=0.0112  monitor_select_dr=0.0136  recent_dr[6]=0.0146
+S4@1.0     n=200  best: trecent[8]=0.0107  oracle=0.0109  recent_dr[8]=0.0112  monitor_select_dr=0.0135  recent_dr[6]=0.0146  timedr[1]=0.0161
+S5@1.0     n=200  best: oracle=0.0084  liu_reg[6]=0.0207  recent_dr[1]=0.0273  monitor_select_dr=0.0273  ablate_mse=0.0288  ablate_bound=0.0320
+wrote /Users/gauris/dev/o-drift/results/03_obd3.json
