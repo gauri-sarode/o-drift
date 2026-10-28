@@ -122,7 +122,7 @@ v2:
     the real base reward with real (not fully independent); misspec-3 sim test is independent
 
 v3:
-  status: DEV  # dev3 in progress; set FROZEN only after the user approves the v3 pre-registration
+  status: FROZEN  # user approved the v3 pre-registration 2026-10-28 ("lets continue the plan"); dev3 done
   opened: 2026-10-27  # user request: back the novelty claim (COPE, ICLR 2025) + one more dev round on S4#m3
   seeds: >-
     dev3 = dev2 seeds and cells; test3 / obd3 = test2 / real2 seeds and cells (never run under v2)
@@ -151,7 +151,7 @@ v3:
   dev3_tuned: >-
     results/tuned_v3.json (2026-10-28): odrift3 offset_scale 0.25; cope size 13; ablation grouping
     mean, alpha 1e-4. Baselines as written there.
-  go_no_go_v3:  # DRAFT 2026-10-28, pending user approval; written after dev3, before any test3/obd3 run
+  go_no_go_v3:  # approved + FROZEN 2026-10-28; written after dev3, before any test3/obd3 run
     - the five go_no_go criteria, unchanged, on test3 misspec-0.5 cells (S6/S7/no-anchor as in v1)
     - the go_no_go_v2 robustness criterion, unchanged, on test3 misspec-3.0 cells and obd3
     - >-
