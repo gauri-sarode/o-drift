@@ -469,3 +469,11 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    the gate drops useful corrected segments and variance rises (bias -> ~0, sd up). The gate cannot
    tell OBD-type bias from useful reuse at the anchor/reference sample sizes. v4 NOT taken to test
    (test4/real4 seeds untouched). Negative result, report as such.
+35. **v5 smoke, stopped before dev5 (2026-10-29; 12 dev episodes x S2, S4, S4#m3)**. Rolling-origin back-test
+   (src/odrift/backtest.py, protocol v5 DEV) chooses among v1 reuse / shrink 0.25 / reference-only.
+   RMSE x1e-3 odrift5 vs v1 / v3 / reference: S2 7.2 vs 5.7 / 5.7 / 8.3; S4 18.6 vs 11.9 / 10.4 / 20.0;
+   S4#m3 19.4 vs 13.0 / 9.8 / 21.6. Back-test RMSEs are 10-130e-3, 5-10x the real errors: the validation
+   value is DR on 2000 rows of one window (sd ~30e-3), so selection is noise-driven. Same limit as the
+   anchor gate (v4): a window is only ~3x the anchor. Finding: with per-window samples of this size no
+   data-driven check can detect reuse bias of ~10e-3 (minimal detectable bias ~ 2.8 sd/sqrt(n)), which is
+   why every validation-based fix trades the simulator against OBD. v5 not run on dev; test4/real4 unused.

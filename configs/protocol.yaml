@@ -255,3 +255,25 @@ v4:
     to be written after dev4 and before any test4/obd4 run; proposed: the v3 list unchanged (five core
     criteria, go_no_go_v2 robustness on misspec-3 + obd4, N1, N2), method under test odrift4[1.96]
 
+v5:
+  status: DEV  # set FROZEN only after the user approves the v5 test pre-registration
+  opened: 2026-10-29  # user asked for another revision (b) after v4 failed dev (PLAN 34); sim-only tuning kept
+  post_hoc: >-
+    motivated by v3 test (OBD3) and v4 dev results; report as a post-hoc revision. v4 never reached test, so
+    test4/real4 seeds are still unused and serve as v5's test seeds (test5 = splits.test4, obd5 = splits.real4).
+    No OBD episode is run for v5 development.
+  method: >-
+    odrift5 = per-episode rolling-origin back-test (src/odrift/backtest.py). For origins o = K-1, K-2 the
+    history window o is split into a pseudo-anchor (anchor size) and a validation part; three candidates run on
+    windows < o and are scored by squared error against the validation part's DR value, averaged over origins
+    and candidate policies. The lowest wins and is used for the real target:
+    reuse = v1 (monitor 1e-4, z_anchor 5, joint, offset_scale 1); shrink = v1 with offset_scale 0.25;
+    reference = newest monitor segment + anchor, DR, no reuse (monitor_select_dr).
+  fixed_a_priori: {origins: 2, candidates: [reuse, shrink, reference]}  # nothing tuned
+  shrink: 0.25  # the v3 dev-tuned value, fixed
+  basis: per-episode rule of v3
+  ablation: grouping ablation as v3 (odrift3 config) for N2
+  go_no_go_v5: >-
+    to be written after dev5 and before any test5/obd5 run; proposed: the v3 list unchanged (five core
+    criteria, go_no_go_v2 robustness on misspec-3 + obd5, N1, N2), method under test odrift5
+

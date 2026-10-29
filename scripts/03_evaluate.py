@@ -26,6 +26,7 @@ from odrift import obd
 from odrift.method import (ODriftConfig, build_components, combine, covariance, fit_all_nuisances,
                            make_corrected_split, odrift_balanced, ratio_function, odrift_corrected, odrift_corrected_split,
                            select_weights)
+from odrift.backtest import backtest_choice
 from odrift.monitor import ResidualStats, reward_changepoints
 from odrift.nuisance import RewardModel, crossfit_rewards, set_basis
 from odrift.regimes import REGIMES
@@ -36,9 +37,11 @@ PROTOCOL = yaml.safe_load((ROOT / "configs/protocol.yaml").read_text())
 SIM, TUNE, V2 = PROTOCOL["simulator"], PROTOCOL["tuning"], PROTOCOL["v2"]
 SPLIT_KEY = {"dev": "dev", "test": "test", "obd": "real", "dev2": "dev2", "test2": "test2", "obd2": "real2",
              "dev3": "dev2", "test3": "test2", "obd3": "real2",  # v3 reuses the v2 seeds (test2/real2 never run)
-             "dev4": "dev2", "test4": "test4", "obd4": "real4"}  # v4: fresh test seeds
+             "dev4": "dev2", "test4": "test4", "obd4": "real4",  # v4: fresh test seeds
+             "dev5": "dev2", "test5": "test4", "obd5": "real4"}  # v5: v4 never reached test, so test4/real4 unused
 V3 = PROTOCOL["v3"]
 V4 = PROTOCOL["v4"]
+V5 = PROTOCOL.get("v5", {})
 V4_GATE_GRID = [1.0, 1.96, 3.0]  # dev4 reporting only; protocol v4.z_gate is fixed
 CFG = ODriftConfig(delta_variance=TUNE["delta_split"]["variance"], delta_bias=TUNE["delta_split"]["bias"],
                    **TUNE["odrift_fixed"])
@@ -97,20 +100,24 @@ def method_grid(split, tuned):
         "timedr": TUNE["baseline_grids"]["time_dr_degree"],
         "tbdecay": TUNE["baseline_grids"]["transport_balanced_decay"],
     }
-    if split in ("dev2", "test2", "dev3", "test3", "dev4", "test4"):  # v2: v1's tuned O-DRIFT kept for comparison + the reuse_lam family
+    if split in ("dev2", "test2", "dev3", "test3", "dev4", "test4", "dev5", "test5"):  # v2: v1's tuned O-DRIFT kept for comparison + the reuse_lam family
         fx = V2["fixed_from_v1"]
         grid["odrift"] = [(fx["monitor_alpha"], fx["z_anchor"], int(fx["joint_segments"]))]
         grid["odrift2"] = V2["reuse_lam_grid"]
-    if split in ("dev3", "test3", "dev4", "test4"):  # v3: COPE baseline + grouping ablation (mechanism-blind statistics)
+    if split in ("dev3", "test3", "dev4", "test4", "dev5", "test5"):  # v3: COPE baseline + grouping ablation (mechanism-blind statistics)
         grid["cope"] = V3["cope_size_grid"]
         grid["odrift3"] = V3["offset_scale_grid"]
         grid["ogroup"] = [(k, a) for k in V3["grouping_kinds"] for a in TUNE["odrift_grid"]["monitor_alpha"]]
     if split in ("dev4", "test4"):  # v4: gated reuse (z_gate fixed by protocol; dev4 shows a small grid)
         grid["odrift4"] = V4_GATE_GRID
-    if split in ("test", "test2", "test3", "test4"):
+    if split in ("dev5", "test5"):  # v5: back-test choice among fixed candidates (nothing tuned)
+        grid["odrift5"] = [V5["shrink"]]
+    if split in ("test", "test2", "test3", "test4", "test5"):
         full = {k: grid[k] for k in ("recent", "decay")}  # for oracle-tuned upper bounds only
         grid = {fam: [tuple(tuned[fam]) if isinstance(tuned[fam], list) else tuned[fam]] for fam in grid}
         grid.update(full)
+    if "odrift5" in grid:  # the shrink candidate is fixed by protocol v5, whatever odrift3 tuned to
+        grid["odrift3"] = sorted(set(grid["odrift3"]) | {V5["shrink"]}, reverse=True)
     return grid
 
 
@@ -346,6 +353,17 @@ def run_one(args):
         put("ablate_mse", *_val_hw(combine(comps, anc, replace(CFG, selection="mse"), 1.0)))
         put("ablate_bound", *_val_hw(combine(comps, anc, replace(CFG, selection="bound"), 1.0)))
 
+    if "odrift5" in grid:  # v5: per-episode rolling-origin back-test picks the candidate
+        m, za, j = grid["odrift"][0]
+        v1_name = f"odrift[{m},{za},{j}]"
+        if has_anchor:
+            choice, bt_mse = backtest_choice(ep.history, n_anchor, pis, A, replace(CFG, z_anchor=za), logger_fns,
+                                             data_seed, monitor_alpha=m, shrink=V5["shrink"])
+            src = {"reuse": v1_name, "shrink": f"odrift3[{V5['shrink']}]", "reference": "monitor_select_dr"}[choice]
+        else:
+            choice, bt_mse, src = "reuse", {}, "odrift"  # no anchor: not certified either way
+        rec["odrift5"] = [dict(p, choice=choice, backtest_mse=bt_mse) for p in rec[src]]
+
     # sample-split O-DRIFT (Proposition 2 conditions), interval only, per policy
     if has_anchor:
         splits = {(m, j): make_corrected_split(ep.history, ep.anchor, ep.target_contexts, A,
@@ -406,12 +424,14 @@ def main():
     args = ap.parse_args()
     dataset = "obd" if args.split.startswith("obd") else "sim"
     split = PROTOCOL["splits"][SPLIT_KEY[args.split]]
-    ver = args.split[-1] if args.split[-1] in "234" else ""
+    ver = args.split[-1] if args.split[-1] in "2345" else ""
     tuned = None
-    if args.split in ("test", "obd", "test2", "obd2", "test3", "obd3", "test4", "obd4"):  # frozen config only; OBD is never tuned on
+    if args.split in ("test", "obd", "test2", "obd2", "test3", "obd3", "test4", "obd4", "test5", "obd5"):  # frozen config only; OBD is never tuned on
         assert PROTOCOL["status"] == "FROZEN", "protocol must be frozen before touching test"
         if ver == "3":
             assert V3.get("status") == "FROZEN", "v3 must be pre-registered (v3.status FROZEN) before touching test3/obd3"
+        if ver == "5":
+            assert V5.get("status") == "FROZEN", "v5 must be pre-registered (v5.status FROZEN) before touching test5/obd5"
         if ver == "4":
             assert V4.get("status") == "FROZEN", "v4 must be pre-registered (v4.status FROZEN) before touching test4/obd4"
         tuned = json.loads((ROOT / f"results/tuned{'_v' + ver if ver else ''}.json").read_text())
