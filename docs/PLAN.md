@@ -498,3 +498,19 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    23.5 / 29.3) and its coverage stays <0.30, as reuse bias does not shrink with n_T. Added to the paper
    as a short post-hoc paragraph (text only; figure kept out for the 12-page limit). Bib venue names
    abbreviated to stay at 12 pages.
+38. **v6 pre-registration and real-reward test (2026-10-29; protocol v6, FROZEN before any v6 result).** User:
+   "do everything make a strong paper"; reviewers of the user's earlier papers criticised simple baselines.
+   Baseline audit: COPE matches Natsubori et al. Eqs. 9-10 (pooled reward model, MIW with density ratio in the
+   target cluster, mean-reward clustering, size tuned); OPFV was only approximated by time-aware DR, so OPFV
+   (Shimizu et al., KDD 2025, Eq. 4 + Eq. 7 feature choice) was implemented (baselines.opfv; degree fixed = 1).
+   Real data: scripts/15_prepare_obd_real.py (all 3 campaigns, 19 time blocks, BTS item frequencies per position
+   as pi_b, BTS on-policy CTR as truth). real6 = 21 tasks x 20 episodes. Smoke runs: dev6 (dev seeds) and one
+   real task with errors suppressed. Result (scripts/16_real_analysis.py): E1 PASS, O-Drift RMSE 1.141e-3 vs
+   best baseline COPE[13] 1.086e-3, ratio 1.05 [1.015, 1.092] (task-cluster bootstrap); per campaign men 1.105,
+   women 1.068, all 0.966 [0.943, 0.995]; monitor split rate 0.007; coverage 0.745. Truth varies 4.1-8.0e-3
+   across target blocks, below estimator noise -> pooling near-optimal, as predicted in expectation_real6.
+   v3 shrinkage beats v1 on men (1.49 vs 3.56). OPFV 4.56 (chooses fine features, high variance).
+   Failure: in 4/420 episodes the 1000-row anchor had zero clicks; its plug-in variance is 0 and
+   method.select_weights' warm start divides by it -> NaN for O-Drift and every component-pooling baseline
+   (transport family). Analysis on the 416 common episodes; failures reported. Code left unchanged while
+   test6 runs.

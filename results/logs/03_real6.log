@@ -1,0 +1,278 @@
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/scripts/03_evaluate.py:308: RuntimeWarning: divide by zero encountered in divide
+  a_ = np.array([g ** (K - c.index) for c in sub]) / np.diag(Ssub)
+/Users/gauris/dev/o-drift/scripts/03_evaluate.py:309: RuntimeWarning: invalid value encountered in divide
+  a_ /= a_.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/scripts/03_evaluate.py:308: RuntimeWarning: divide by zero encountered in divide
+  a_ = np.array([g ** (K - c.index) for c in sub]) / np.diag(Ssub)
+/Users/gauris/dev/o-drift/scripts/03_evaluate.py:309: RuntimeWarning: invalid value encountered in divide
+  a_ /= a_.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/scripts/03_evaluate.py:308: RuntimeWarning: divide by zero encountered in divide
+  a_ = np.array([g ** (K - c.index) for c in sub]) / np.diag(Ssub)
+/Users/gauris/dev/o-drift/scripts/03_evaluate.py:309: RuntimeWarning: invalid value encountered in divide
+  a_ /= a_.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/scripts/03_evaluate.py:308: RuntimeWarning: divide by zero encountered in divide
+  a_ = np.array([g ** (K - c.index) for c in sub]) / np.diag(Ssub)
+/Users/gauris/dev/o-drift/scripts/03_evaluate.py:309: RuntimeWarning: invalid value encountered in divide
+  a_ /= a_.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+/Users/gauris/dev/o-drift/src/odrift/method.py:260: RuntimeWarning: divide by zero encountered in divide
+  x0 = 1 / np.diag(Q)
+/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: invalid value encountered in divide
+  x0 /= x0.sum()
+REAL@0.0   n=420  best: decay_dr[0.95]=0.0011  cope[13]=0.0011  slope[3.0]=0.0011  pooled_dr=0.0011  recent_dr[12]=0.0011  balanced_dr=0.0011
+wrote /Users/gauris/dev/o-drift/results/03_real6.json
