@@ -16,7 +16,7 @@ A window can differ from the target in $P_k$, in $\mu_k$ or in $q_k$. With logge
 propensities and a density ratio $w_k(x)=P_T(x)/P_k(x)$, the reweighted DR score of a record
 in window $k$,
 \begin{equation}\label{eq:dr}
-  \Gamma_k(x,a,r)=\textstyle\sum_{a'}\pi(a'\mid x)\hat q(x,a')\big|_{x\sim P_T}
+  \Gamma_k(x,a,r)=\mathbb{E}_{x'\sim P_T}\Big[\textstyle\sum_{a'}\pi(a'\mid x')\,\hat q(x',a')\Big]
   + w_k(x)\,\frac{\pi(a\mid x)}{\mu_k(a\mid x)}\,\big(r-\hat q(x,a)\big),
 \end{equation}
 has expectation $\mathbb{E}_{P_T}[\sum_a\pi(a\mid x)q_k(x,a)]$ for any $\hat q$. It
@@ -37,8 +37,8 @@ Our regimes violate each assumption in turn (S6 breaks A1, S7 A2, S3b and S5 A3,
 the misspecified cells A4) so that we can see where the method fails.
 
 \paragraph{Observability of reward drift.}
-Without an anchor, $b_k$ is not identified from history: any $q_T$ that agrees with
-nothing in the logs is consistent with them, so no method can certify an estimate. With
+Without an anchor, $b_k$ is not identified from history: the logs constrain only
+$q_1,\dots,q_K$, any $q_T$ is consistent with them, and no method can certify an estimate. With
 an anchor, $b_k$ is identified, but only up to the noise of the anchor estimate, whose
 standard deviation is of order $\sigma/\sqrt{n_T}$. Biases below this level cannot be
 detected from the anchor, however the test is built: a level-$\alpha$ test with power

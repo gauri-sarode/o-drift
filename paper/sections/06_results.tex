@@ -75,9 +75,11 @@ reuse corrected segments (\cref{tab:revisions}). A gate (v4) that drops a segmen
 differs from the reference (reference segment plus anchor) at the 5\% level removes the bias but
 raises the variance, and loses in S4 ($1.32\times$ the best baseline) and in S4 at
 misspecification 3 ($1.61\times$). A rolling-origin back-test (v5) that treats the newest
-history window as a pseudo-target and chooses among full reuse, shrunk reuse and no reuse picks
-each option in roughly a third of the episodes in every cell, including those without drift, and
-is worse than the best fixed version in six of nine cells (up to $2.1\times$). Neither was taken to
+history window as a pseudo-target and chooses among full reuse, shrunk reuse and no reuse. It picks each option in roughly a third of
+the episodes in every reward-drift cell, and no reuse in 31--54\% of the episodes without reward
+drift, where
+reuse is exactly right; it is worse than the best fixed version in six of nine cells (up to
+$2.1\times$) and tied in a seventh. Neither was taken to
 a test split. Both fail for the reason given in \cref{sec:setting}: an anchor of 1{,}000 records
 gives a DR estimate with RMSE $42\times10^{-3}$, and a held-out window of 4{,}000 records about half
 of that, while the reuse bias that separates good from bad decisions is around $10\times10^{-3}$.
