@@ -1,5 +1,24 @@
 \section{Limitations and Conclusion}\label{sec:conclusion}
-% Budget: ~0.5 pp. Limitations: information limit (anchor/reference noise bounds what
-% any validation can detect); model-class assumption for reward drift; semi-synthetic,
-% not natural longitudinal drift; propensities assumed logged correctly.
-\todo{limitations and conclusion}
+
+O-DRIFT rests on a simple point: for OPE under drift, the age of a window matters less than
+which mechanism changed it. A residual test on the conditional reward, unlike tests on raw
+rewards, does not mistake context or logger drift for reward drift, and in our pre-registered
+evaluation this made the difference between O-DRIFT and a cross-domain estimator that groups
+periods by mean reward in every reward-drift setting.
+
+The limitations are as important as the result. First, drift-corrected reuse depends on the
+reward-drift difference lying in the model class (A4); on semi-synthetic Open Bandit data,
+with a misspecified model and large drift, it was heavily biased, and the estimator without
+reuse was the better choice. Second, data-driven checks of reuse on the anchor or on a held-out
+window could not repair this, because samples of the size available per period cannot detect
+the biases involved; we see this as an information limit, not a tuning problem, and we expect
+it to bind any method that validates reuse on the current period alone. Third, gradual drift
+violates the piecewise assumption and favours methods that model a trend. Fourth, our
+heterogeneity-adjusted interval undercovers when bias remains, and the certified alternative
+is wide. Finally, Open Bandit provides real contexts and their real order but synthetic
+rewards and drift; an evaluation on naturally drifting logged data remains open.
+
+Two directions follow. One is to combine the monitor with reward models flexible enough to
+make (A4) plausible, so that reuse is safe when it is attempted. The other is to accept the
+information limit and to report, for each estimate, how much undetectable drift it would
+take to change a deployment decision.

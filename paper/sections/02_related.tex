@@ -1,16 +1,59 @@
 \section{Related Work}\label{sec:related}
-% Budget: ~1.0 pp incl. Table 1 (novelty matrix: rows = methods, columns = handles
-% context drift / logger drift / reward drift / uses anchor / interval).
-% Groups and verified keys (references.bib):
-%  - OPE basics: horvitz1952generalization, dudik2011doubly, chernozhukov2018double (cross-fitting)
-%  - Multiple loggers / balanced weights: agarwal2017effective, kallus2021optimal
-%  - Covariate shift in OPE: uehara2020offpolicy
-%  - Non-stationary OPE: jagerman2019when (moving-average estimators),
-%    thomas2017predictive (time-series forecasting of OPE), chandak2020towards (forecast + wild bootstrap),
-%    liu2023asymptotically (regression-assisted DR reusing old data) -- closest; must contrast
-%  - Estimator selection / blending: thomas2016data (MAGIC), su2020adaptive (SLOPE),
-%    zhan2021offpolicy (adaptive weighting)
-%  - Drift detection: gama2014survey; heterogeneity tests cochran1954combination,
-%    dersimonian1986meta -- cite our monitor/interval as instances, do not claim novelty
-%  - Pre-test estimators: bancroft1944biases (reference-veto risk bump)
-\todo{related work}
+
+\paragraph{Off-policy evaluation.}
+Inverse propensity scoring~\cite{horvitz1952generalization} and the doubly robust (DR)
+estimator~\cite{dudik2011doubly} are the standard tools for contextual bandit OPE; we
+cross-fit the reward models as in double machine learning~\cite{chernozhukov2018double}.
+When the data come from several loggers, weighting each record by the mixture of the
+logging policies (balanced or multiple importance weighting) reduces variance and stays
+unbiased~\cite{agarwal2017effective,kallus2021optimal}. Covariate shift between the
+logging and target populations is handled by density-ratio transport~\cite{uehara2020offpolicy}.
+O-DRIFT uses all three ingredients; what it adds is the decision of which historical
+data the reweighted estimate may use.
+
+\paragraph{Non-stationary OPE.}
+Jagerman et al.~\cite{jagerman2019when} study sliding-window and exponentially decayed
+estimators for non-stationary bandits. Thomas et al.~\cite{thomas2017predictive} and
+Chandak et al.~\cite{chandak2020towards,chandak2022offpolicy} forecast the future value of a policy from
+its past per-period estimates, and Shimizu et al.~\cite{shimizu2025offpolicy} estimate
+future values by exploiting time features shared between past and future. Liu et
+al.~\cite{liu2023asymptotically} reuse a reward model fitted on older data inside a DR
+estimator on the new data. These methods weight data by time or by a model of the trend
+in the value; none distinguishes the mechanism behind a change.
+
+\paragraph{Cross-domain OPE.}
+COPE~\cite{natsubori2025cross} treats other domains as sources for a target domain,
+clusters domains by the similarity of their mean rewards and combines multiple importance
+weighting inside the target cluster with a decomposed reward model. Treating time
+windows as domains makes COPE the closest existing estimator to ours. Its clustering
+statistic, the mean reward, mixes all three mechanisms; our monitor isolates the one
+that biases reweighted estimates. We include COPE as a tuned baseline and as a grouping
+ablation.
+
+\paragraph{Estimator selection and drift detection.}
+MAGIC~\cite{thomas2016data}, SLOPE~\cite{su2020adaptive} and adaptive weighting~\cite{zhan2021offpolicy}
+choose among or blend estimators of increasing bias and decreasing variance; we use the
+first two as baselines over nested recency windows. Drift detection on data streams is
+surveyed by Gama et al.~\cite{gama2014survey}. Our monitor is a heterogeneity test in the
+sense of Cochran~\cite{cochran1954combination} applied to per-action residuals, and our
+interval is the DerSimonian--Laird random-effects interval~\cite{dersimonian1986meta}; we
+claim novelty for the statistic being tested, not for the tests. Choosing segments by a
+preliminary test is a pre-test estimator~\cite{bancroft1944biases}, and it shares the
+known risk of such estimators near the detection threshold.
+
+\begin{table}[t]\centering\scriptsize
+\caption{What existing estimators adapt to. Context and logger drift are handled by
+reweighting; ``reward drift'' means the method decides which data to reuse according
+to changes in $q_t(x,a)$.}
+\label{tab:related}
+\begin{tabular}{@{}lccccc@{}}\toprule
+Method & Context drift & Logger drift & Reward drift & Uses anchor & Interval \\\midrule
+Sliding window / decay~\cite{jagerman2019when} & -- & \checkmark & by recency & -- & -- \\
+Forecasting~\cite{thomas2017predictive,chandak2020towards} & -- & \checkmark & by trend & -- & \checkmark \\
+OPFV~\cite{shimizu2025offpolicy} & -- & \checkmark & by time features & -- & -- \\
+Regression-assisted DR~\cite{liu2023asymptotically} & -- & \checkmark & by recency & \checkmark & \checkmark \\
+SLOPE / MAGIC~\cite{su2020adaptive,thomas2016data} & -- & \checkmark & by bias--variance & \checkmark & -- \\
+COPE~\cite{natsubori2025cross} & -- & \checkmark & by mean reward & \checkmark & -- \\
+\odrift{} (ours) & \checkmark & \checkmark & by residual test on $q_t$ & \checkmark & \checkmark \\\bottomrule
+\end{tabular}
+\end{table}

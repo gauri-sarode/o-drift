@@ -1,17 +1,64 @@
 \section{Experimental Setup}\label{sec:setup}
-% Budget: ~1.0 pp.
-% Checklist:
-%  - Simulator regimes (src/odrift/regimes.py): S0 stationary; S1 covariate drift;
-%    S2 logger switches; S3a abrupt reward drift; S3b gradual reward drift;
-%    S4 mixed (worked example); S5 seasonal; S6 wrong logged propensities;
-%    S7 support loss; S8/S8b out-of-class reward drift. Misspecification levels 0.5 / 3.0.
-%  - Semi-synthetic Open Bandit (saito2021open): Men campaign, random policy,
-%    8 PCA contexts, 13 time blocks, base reward fit on real clicks (nonlinear share 0.41).
-%  - Baselines (all tuned on dev with the same rule): pooled/recent/decay DR, min-var,
-%    transport DR, Liu reg-DR, SLOPE, MAGIC, time-aware recent/decay/balanced decay,
-%    forecast, time-DR, anchor-only, balanced DR, monitor-select.
-%  - Protocol: configs/protocol.yaml frozen before tuning; dev-only tuning; test splits run
-%    once; v2/v3 amendments pre-registered with dates; report post-hoc findings as such.
-%  - Metrics: RMSE (headline), paired bootstrap CI vs best tuned baseline, coverage,
-%    half-width, policy-selection regret.
-\todo{experimental setup}
+
+\paragraph{Simulated regimes.}
+Each environment has $d=5$ Gaussian contexts, 10 actions and per-action logistic rewards
+with a linear part and a nonlinear part of weight $0.5$ (``misspecification 0.5'') or $3.0$.
+The level $3.0$ was fixed by matching the nonlinear share of logit variance in Open Bandit
+($0.43$ vs.\ $0.41$) before any result at that level was seen. The history has $K=12$ windows
+of 5{,}000 records; the anchor has 1{,}000 records and there are 10{,}000 target
+contexts. Ground truth is exact over actions and Monte Carlo over $10^6$ contexts.
+The regimes isolate one mechanism at a time:
+S0 stationary;
+S1 context drift growing with age;
+S2 logger switches A$\to$B$\to$C;
+S3a abrupt reward drift in the older half;
+S3b gradual reward drift towards the target;
+S4 mixed (oldest third reward-drifted, middle third context-shifted, newest third poorly
+explored);
+S5 seasonal context and reward drift;
+S6 wrong logged propensities (violates A1);
+S7 recent windows that never play three actions (violates A2);
+S8 reward drift along an out-of-class interaction, S8b the same without an in-class component
+(violate A4). Intensities are given with each regime in \cref{tab:main}. Four candidate
+policies of increasing noise around the optimal policy are evaluated in every episode.
+
+\paragraph{Open Bandit semi-synthetic data.}
+We use the uniformly random logging data of the Men campaign of the Open Bandit
+Dataset~\cite{saito2021open} (452{,}949 records, 34 items). Contexts are the real user
+features reduced to 8 principal components, in their real temporal order, split into 13
+blocks of equal size (12 history windows and the target block). The base reward is a
+per-action logistic model with linear and quadratic terms fitted to the real clicks and
+shifted to a mean click rate of $0.05$; actions, propensities, rewards and the injected
+logger and reward drift are synthetic. Because the generating model is quadratic, the
+methods' reward models are misspecified. These data test robustness, not natural drift.
+
+\paragraph{Baselines.}
+All estimators share the reward models and the per-episode basis rule. We compare pooled
+DR; anchor-only DR; sliding-window DR (recent $k$ windows + anchor) and exponentially decayed
+DR~\cite{jagerman2019when}; minimum-variance window pooling; density-ratio transport DR and its
+recent-$k$, decayed and balanced-decayed variants; regression-assisted DR~\cite{liu2023asymptotically};
+SLOPE~\cite{su2020adaptive} and MAGIC~\cite{thomas2016data} over nested recency windows;
+forecasting of per-window values~\cite{thomas2017predictive}; a time-aware DR whose reward model
+includes a polynomial time trend; balanced multiple-logger DR~\cite{agarwal2017effective}; an
+anchor-validated window selector; COPE~\cite{natsubori2025cross} with time windows as domains,
+the anchor as the target domain and the cluster size tuned; and ``monitor-select'', DR on
+the newest monitor segment plus the anchor without reuse.
+
+\paragraph{Protocol.}
+The protocol (\texttt{configs/protocol.yaml} in the code) was fixed before tuning. Every
+method family, baselines included, is tuned on a development split (four environments,
+200 episodes per cell) by minimising the mean over cells of log RMSE. Test splits use
+unseen environments (300 episodes per cell; 200 for Open Bandit) and are run once per
+frozen configuration. The version reported here is the third pre-registered one. The first
+passed its simulator criteria on separate test seeds but failed on Open Bandit; we then
+added the misspecification-3 cells and the robustness criterion, and the third version
+added the per-episode basis, offset shrinkage, the COPE baseline and the grouping ablation.
+All of these changes were registered before the test run reported here, and their results
+are labelled as post-hoc where they were informed by earlier tests.
+The pre-registered criteria are listed in \cref{tab:criteria}.
+
+\paragraph{Metrics.}
+We report RMSE ($\times10^{-3}$), its ratio to the best tuned baseline in each cell with a
+paired bootstrap 95\% interval of the RMSE difference (10{,}000 resamples of episodes),
+coverage of the nominal 95\% interval, and, for the monitor, the share of episodes in which
+the history is split into more than one segment.

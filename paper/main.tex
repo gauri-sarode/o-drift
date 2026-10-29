@@ -1,11 +1,8 @@
-% PAKDD 2027 Research Track -- Springer LNCS, <= 12 pages INCLUDING references and appendices.
-% Abstract <= 200 words. Double-blind: no names, affiliations, acknowledgements, funding,
-% identifying links or repository URLs; cite own prior work in the third person.
-% Generative-AI policy: prose is author-written; AI use (grammar only in the text) is
-% disclosed on the CMT form. Build: latexmk -pdf main.tex
+% Springer LNCS draft (venue to be decided; not PAKDD). Build: latexmk -pdf main.tex
+% Anonymous author block kept until the venue's review policy is known.
 \documentclass[runningheads]{llncs}
 \usepackage[T1]{fontenc}
-\usepackage{graphicx,amsmath,amssymb,booktabs,multirow,xcolor}
+\usepackage{graphicx,amsmath,amssymb,booktabs,multirow,xcolor,algorithm,algpseudocode}
 \usepackage{hyperref}
 \usepackage[capitalize,noabbrev]{cleveref}
 \input{macros}
@@ -26,7 +23,6 @@
 \input{sections/06_results}
 \input{sections/07_conclusion}
 
-\nocite{*} % TEMP: remove once text cites
 \bibliographystyle{splncs04}
 \bibliography{references}
 \end{document}

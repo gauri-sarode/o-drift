@@ -1,11 +1,45 @@
 \section{Problem Setting}\label{sec:setting}
-% Budget: ~1.5 pp.
-% Checklist:
-%  - Data: periods t=1..T-1 with (x, a, r, mu_t(a|x)); target period T; anchor of size n_anc.
-%  - Estimand V_T(pi) = E_{x~P_T} sum_a pi(a|x) q_T(x,a).
-%  - Three drift mechanisms: P_t(x), mu_t, q_t. Which are identifiable/correctable and how.
-%  - Assumptions list (A1..): logged propensities correct (S6 violates), overlap/support (S7 violates),
-%    reward drift is piecewise / in the model class (S8, misspec cells stress this).
-%  - Impossibility example: without an anchor, reward drift is not identifiable from history;
-%    with an anchor, only up to anchor noise (information limit seen in S4#m3 diagnosis).
-\todo{problem setting}
+
+\paragraph{Data.}
+Time is divided into windows $k=1,\dots,K$ followed by a target period $T$. Window $k$
+contributes logged records $\mathcal{D}_k=\{(x_i,a_i,r_i,\mu_k(a_i\mid x_i))\}_{i=1}^{n_k}$ with
+contexts $x\sim P_k$, actions $a\sim\mu_k(\cdot\mid x)$ from the logger deployed in
+window $k$, and binary rewards with conditional mean $q_k(x,a)$. From the target period we
+have a small anchor $\mathcal{D}_T$ of $n_T\ll\sum_k n_k$ logged records and a sample
+$\{x^*_j\}_{j=1}^{M}$ of unlabelled target contexts. The estimand for a target policy $\pi$ is
+\begin{equation}
+  V_T(\pi)=\mathbb{E}_{x\sim P_T}\Big[\sum_a \pi(a\mid x)\,q_T(x,a)\Big].
+\end{equation}
+
+\paragraph{Three drift mechanisms.}
+A window can differ from the target in $P_k$, in $\mu_k$ or in $q_k$. With logged
+propensities and a density ratio $w_k(x)=P_T(x)/P_k(x)$, the reweighted DR score of a record
+in window $k$,
+\begin{equation}\label{eq:dr}
+  \Gamma_k(x,a,r)=\textstyle\sum_{a'}\pi(a'\mid x)\hat q(x,a')\big|_{x\sim P_T}
+  + w_k(x)\,\frac{\pi(a\mid x)}{\mu_k(a\mid x)}\,\big(r-\hat q(x,a)\big),
+\end{equation}
+has expectation $\mathbb{E}_{P_T}[\sum_a\pi(a\mid x)q_k(x,a)]$ for any $\hat q$. It
+equals $V_T(\pi)$ exactly when $q_k=q_T$ on the support of $\pi$ under $P_T$. Context and
+logger drift therefore cost variance but not bias; reward drift costs bias that no
+reweighting removes. The transfer bias of window $k$ is
+$b_k=\mathbb{E}_{P_T}[\sum_a\pi(a\mid x)(q_k-q_T)(x,a)]$.
+
+\paragraph{Assumptions.}
+(A1) Logged propensities are the ones used at event time.
+(A2) Overlap: $\pi(a\mid x)>0$ implies $\mu_k(a\mid x)>0$ for the windows used, and the
+context ratio $w_k$ is bounded.
+(A3) Reward drift is piecewise: the windows split into contiguous segments with a
+common $q$ within each segment.
+(A4) For drift-corrected reuse, the difference between segment rewards lies in the
+reward-model class (on the logit scale).
+Our regimes violate each assumption in turn (S6 breaks A1, S7 A2, S3b and S5 A3, S8 and
+the misspecified cells A4) so that we can see where the method fails.
+
+\paragraph{What the anchor can and cannot do.}
+Without an anchor, $b_k$ is not identified from history: any $q_T$ that agrees with
+nothing in the logs is consistent with them, so no method can certify an estimate. With
+an anchor, $b_k$ is identified, but only up to the noise of the anchor estimate, whose
+standard deviation is of order $\sigma/\sqrt{n_T}$. Biases below this level cannot be
+detected from the anchor, however the test is built. This limit governs the failure
+we report in \cref{sec:results}.
