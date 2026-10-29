@@ -49,12 +49,10 @@ The protocol (\texttt{configs/protocol.yaml} in the code) was fixed before tunin
 method family, baselines included, is tuned on a development split (four environments,
 200 episodes per cell) by minimising the mean over cells of log RMSE. Test splits use
 unseen environments (300 episodes per cell; 200 for Open Bandit) and are run once per
-frozen configuration. The version reported here is the third pre-registered one. The first
-passed its simulator criteria on separate test seeds but failed on Open Bandit; we then
-added the misspecification-3 cells and the robustness criterion, and the third version
-added the per-episode basis, offset shrinkage, the COPE baseline and the grouping ablation.
-All of these changes were registered before the test run reported here, and their results
-are labelled as post-hoc where they were informed by earlier tests.
+frozen configuration. The version reported here is the third pre-registered one: the first
+passed its simulator criteria on separate test seeds but failed on Open Bandit, which led to
+the misspecification-3 cells, the robustness criteria, the per-episode basis, offset
+shrinkage, the COPE baseline and the grouping ablation, all registered before this test run.
 Twelve criteria were pre-registered: five on accuracy, coverage, support and abstention (C1--C5),
 two on robustness in the misspecification-3 and Open Bandit cells (R1: no ratio above 1.5;
 R2: ratio at most 1 in at least half of them), two against COPE (N1) and three on the grouping

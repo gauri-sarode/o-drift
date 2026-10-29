@@ -1,6 +1,8 @@
 \section{Method}\label{sec:method}
 
-O-DRIFT has four steps: segment the history by reward drift, fit joint
+\odrift{} follows the observability asymmetry of \cref{sec:setting}: decisions that need to
+see small reward changes are made on history, and the anchor is used only where a coarse
+decision suffices. It has four steps: segment the history by reward drift, fit joint
 reward models, form one drift-corrected estimate per segment, and pool them with the anchor.
 
 \subsection{A reward-drift monitor}
@@ -77,7 +79,7 @@ all direct-method terms. Because a residual bias may remain, we report the
 DerSimonian--Laird interval~\cite{dersimonian1986meta}, which inflates the standard error
 by the between-component heterogeneity $\hat\tau^2$. As a certified alternative we also
 report a sample-split interval with an explicit bias allowance; it is valid but wide.
-Without an anchor O-DRIFT returns an estimate flagged as not certified.
+Without an anchor \odrift{} returns an estimate flagged as not certified.
 
 
 \paragraph{Settings.} $\alpha=10^{-4}$ and $z_{\mathrm{anc}}=5$ were tuned on the development

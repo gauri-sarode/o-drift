@@ -173,7 +173,7 @@ def fig_ratios(summ, nov):
     ax.set_xticks(ticks, [f"{t:g}" for t in ticks])
     ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
     ax.set_yticks(y, [k.replace("#m3.0", " m3") for k in keys], fontsize=5)
-    ax.set_xlabel("RMSE ratio (O-DRIFT / comparator)", fontsize=6)
+    ax.set_xlabel("RMSE ratio (O-Drift / comparator)", fontsize=6)
     ax.tick_params(axis="x", labelsize=6)
     ax.legend(fontsize=5, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2, frameon=False)
     fig.tight_layout()

@@ -9,9 +9,8 @@ logger is replaced, and the click-through behaviour of the same users on the sam
 moves. What a team needs is the value of the candidate policy \emph{now}, in a target
 period for which only a small sample has been collected.
 
-Two simple answers bracket the problem. Pooling all history gives a low-variance
-estimate that is biased whenever the environment has changed. Using only the small
-target sample (the \emph{anchor}) is unbiased but noisy. Existing remedies interpolate
+Pooling all history gives a low-variance estimate that is biased whenever the environment
+has changed; using only the small target sample (the \emph{anchor}) is unbiased but noisy. Existing remedies interpolate
 between the two along the time axis: sliding windows and moving averages~\cite{jagerman2019when},
 exponential decay, forecasting the policy value as a time series~\cite{thomas2017predictive,chandak2020towards},
 and regression-assisted estimators that reuse a model fitted on recent data~\cite{liu2023asymptotically}.
@@ -27,22 +26,32 @@ looked different but clicked in the same way is as informative as yesterday; a r
 period after a change in click behaviour is not. Recency is a proxy for the mechanism
 that matters, and a poor one when contexts or loggers drift more often than rewards.
 
-We turn this observation into an estimator, O-DRIFT (OPE under DRIFT). It tests for drift in the
+We turn this observation into an estimator, \odrift{} (off-policy evaluation under drift). It tests for drift in the
 conditional reward directly, with a per-action residual statistic computed from one
 pooled reward model, and segments the history by binary segmentation. Under correct
 specification the test keeps its nominal level under any context or logger drift
 (Proposition~\ref{prop:invariance}), whereas statistics built from raw rewards, such
 as the mean-reward similarity used by the cross-domain estimator COPE~\cite{natsubori2025cross},
-do not. Within each segment O-DRIFT pools windows with balanced multiple-logger weights;
+do not. Within each segment \odrift{} pools windows with balanced multiple-logger weights;
 across segments it fits joint reward models with a shared base and per-segment offsets,
 reuses older segments after correcting their reward offset, and combines the segment
 estimates with the anchor at minimum variance.
 
+A second question is what can be seen at all. Drift \emph{between} historical windows is
+observed through tens of thousands of records, so even small changes in $q_t$ are detectable;
+drift between the history and the target period is observed only through the anchor, so only
+large changes are. \odrift{} is \emph{observability-aware} in this sense: it segments the
+history where reward drift is observable, uses the anchor only for the coarse decision of which
+segment is closest to the target, and declines to certify an estimate when no anchor is available.
+The same view explains its main failure: the bias of drift-corrected reuse is too small for
+the anchor to observe and too large to ignore.
+
 Our contributions are:
 \begin{itemize}
-\item a mechanism decomposition of drift for OPE and a reward-drift monitor whose size
-  does not depend on context or logger drift (\cref{sec:setting,sec:method});
-\item the O-DRIFT estimator, with segment-wise joint reward models, drift-corrected
+\item a mechanism decomposition of drift for OPE, an observability analysis of which reward
+  drift the data can reveal, and a reward-drift monitor whose size does not depend on context
+  or logger drift (\cref{sec:setting,sec:method});
+\item the \odrift{} estimator, with segment-wise joint reward models, drift-corrected
   reuse, minimum-variance pooling and a random-effects interval (\cref{sec:method});
 \item a pre-registered evaluation on simulated regimes and semi-synthetic Open Bandit
   data~\cite{saito2021open}, with a one-shot test split, a COPE baseline and a

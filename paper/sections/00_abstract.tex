@@ -5,11 +5,11 @@ earlier periods, with only a small sample from the period itself. Common remedie
 still informative. We argue that the useful question
 is not how recent a period is but which mechanism changed: a change in the context
 distribution or in the logging policy can be corrected by reweighting, while only a
-change in the conditional reward biases a reweighted estimate. We propose O-DRIFT, which
+change in the conditional reward biases a reweighted estimate. We propose \odrift{}, which
 segments the history with a per-action residual test that is invariant to context and
 logger drift, fits joint reward models across segments, reuses older segments with a
 drift correction, and pools the segment estimates at minimum variance with a
-random-effects interval. In a pre-registered evaluation with a one-shot test split, O-DRIFT
+random-effects interval. In a pre-registered evaluation with a one-shot test split, \odrift{}
 outperforms a cross-domain estimator that groups periods by mean reward in all 15
 reward-drift settings, and replacing its residual test by mean-reward grouping causes
 spurious splits under context and logger drift. On semi-synthetic Open Bandit data,

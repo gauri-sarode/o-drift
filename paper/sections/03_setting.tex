@@ -36,10 +36,15 @@ reward-model class (on the logit scale).
 Our regimes violate each assumption in turn (S6 breaks A1, S7 A2, S3b and S5 A3, S8 and
 the misspecified cells A4) so that we can see where the method fails.
 
-\paragraph{What the anchor can and cannot do.}
+\paragraph{Observability of reward drift.}
 Without an anchor, $b_k$ is not identified from history: any $q_T$ that agrees with
 nothing in the logs is consistent with them, so no method can certify an estimate. With
 an anchor, $b_k$ is identified, but only up to the noise of the anchor estimate, whose
 standard deviation is of order $\sigma/\sqrt{n_T}$. Biases below this level cannot be
-detected from the anchor, however the test is built. This limit governs the failure
-we report in \cref{sec:results}.
+detected from the anchor, however the test is built: a level-$\alpha$ test with power
+$1-\beta$ needs $|b_k|\gtrsim(z_{\alpha/2}+z_\beta)\,\sigma/\sqrt{n_T}$. We call drift
+\emph{observable} when it exceeds this threshold for the sample that must reveal it. Drift
+between two historical windows is judged on $n_k$ records and is observable down to small
+sizes; drift between the history and the target is judged on the $n_T$ anchor records and is
+observable only when large. This asymmetry shapes the design in \cref{sec:method} and
+governs the failure we report in \cref{sec:results}.
