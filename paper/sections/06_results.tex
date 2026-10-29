@@ -39,8 +39,7 @@ mean-reward statistic (same segmentation procedure and threshold grid).}
 Two pre-registered checks address this (right half of \cref{tab:main}, \cref{fig:splits}).
 Against tuned COPE, which groups windows by mean reward, \odrift{} has lower RMSE in all 15
 reward-drift cells (ratios 0.19--0.93, intervals excluding zero) and ties it in S0--S2; COPE is
-better only in S6 and S7 (1.07, 1.30), the regimes with faulty propensities or lost support. Tuned
-COPE keeps all windows in its cluster, so grouping by mean reward did not beat pooling. The
+better only in S6 and S7 (1.07, 1.30), with faulty propensities or lost support. The
 grouping ablation keeps the whole \odrift{} pipeline and replaces only the monitor statistic by
 the mean reward. The residual monitor never splits the history when the
 reward is stable (S0--S2, and S6--S7), as \cref{prop:invariance} predicts, whereas the mean-reward
@@ -63,9 +62,8 @@ reward is quadratic, the reward models linear (the basis rule chose linear featu
 episode), and the drift three times the standard deviation of the base logit, so the offsets
 $\delta_j$ absorb model error as well as drift and the corrected segments carry a bias the
 anchor cannot observe. Offset shrinkage
-makes this worse (S3a, intensity 1: 36.4 vs.\ 10.0 without shrinkage). The robustness
-criteria R1 and R2 therefore fail. Of the twelve pre-registered criteria, the other ten pass
-(C1--C5 and N1--N2).
+makes this worse (S3a, intensity 1: 36.4 vs.\ 10.0 without shrinkage). Robustness criteria R1--R2
+therefore fail; the other ten pre-registered criteria (C1--C5, N1--N2) pass.
 
 \input{tables/tab_revisions}
 
@@ -74,12 +72,16 @@ After this test we tried, on development data only, two ways to decide per episo
 reuse corrected segments (\cref{tab:revisions}). A gate (v4) that drops a segment whose estimate
 differs from the reference (reference segment plus anchor) at the 5\% level removes the bias but
 raises the variance, and loses in S4 ($1.32\times$ the best baseline) and in S4 at
-misspecification 3 ($1.61\times$). A rolling-origin back-test (v5) that treats the newest
-history window as a pseudo-target and chooses among full reuse, shrunk reuse and no reuse. It picks each option in roughly a third of
-the episodes in every reward-drift cell, and no reuse in 31--54\% of the episodes without reward
-drift, where
-reuse is exactly right; it is worse than the best fixed version in six of nine cells (up to
-$2.1\times$) and tied in a seventh. Neither was taken to
-a test split. Both fail for the reason given in \cref{sec:setting}: an anchor of 1{,}000 records
-gives a DR estimate with RMSE $42\times10^{-3}$, and a held-out window of 4{,}000 records about half
-of that, while the reuse bias that separates good from bad decisions is around $10\times10^{-3}$.
+misspecification 3 ($1.61\times$). A rolling-origin back-test (v5) treats the newest
+history window as a pseudo-target and chooses among full reuse, shrunk reuse and no reuse; it rejects reuse in 31--54\% of episodes without reward drift, where reuse is exactly
+right, and is worse than the best fixed version in six of nine cells (up to
+$2.1\times$) and tied in a seventh. Neither was tested. Both fail for the reason given in \cref{sec:setting}: a 1{,}000-record anchor gives a DR
+RMSE of $42\times10^{-3}$ (a 4{,}000-record window about half), while the decisive reuse bias is
+about $10\times10^{-3}$.
+
+\paragraph{How large must the anchor be? (post-hoc).}
+With anchors of 100, 1{,}000 and 10{,}000 records (eight cells, frozen v3), anchor-only DR
+follows $1/\sqrt{n_T}$ (RMSE $153$, $42$, $12\times10^{-3}$) while \odrift{} hardly moves (S4:
+$14.2$, $14.1$, $11.1$; no anchor: $68.5$): segmentation uses history, and 100 records identify the
+reference. Under gradual or seasonal drift (S3b, S5), however, the large anchor alone wins
+($11.9$ vs.\ $23.5$, $29.3$), since reuse bias does not shrink with $n_T$.

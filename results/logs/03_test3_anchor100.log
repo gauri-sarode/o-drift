@@ -1,0 +1,9 @@
+S0@0.0     n=300  best: minvar_dr=0.0051  slope[3.0]=0.0052  pooled_dr=0.0052  recent_dr[12]=0.0052  balanced_dr=0.0052  monitor_select_dr=0.0052
+S1@2.0     n=300  best: cope[13]=0.0079  odrift[0.0001,5.0,1]=0.0080  odrift2[0.0]=0.0080  odrift3[0.25]=0.0080  ablate_nobalance[0.0001,5.0,1]=0.0086  ablate_group[mean,0.0001]=0.0086
+S2@0.0     n=300  best: balanced_dr=0.0048  cope[13]=0.0052  odrift[0.0001,5.0,1]=0.0052  odrift2[0.0]=0.0052  odrift3[0.25]=0.0052  minvar_dr=0.0055
+S3a@1.0    n=300  best: odrift[0.0001,5.0,1]=0.0065  odrift2[0.0]=0.0065  ablate_nobalance[0.0001,5.0,1]=0.0065  recent_dr[6]=0.0070  monitor_select_dr=0.0070  oracle=0.0071
+S3b@1.0    n=300  best: timedr[1]=0.0092  forecast[1]=0.0126  oracle=0.0156  recent_dr[2]=0.0175  recent_dr[3]=0.0180  decay_dr[0.5]=0.0186
+S4@1.0     n=300  best: odrift3[0.25]=0.0142  ablate_group[mean,0.0001]=0.0144  ablate_nobalance[0.0001,5.0,1]=0.0146  odrift[0.0001,5.0,1]=0.0148  odrift2[0.0]=0.0148  oracle=0.0217
+S5@1.0     n=300  best: oracle=0.0121  odrift[0.0001,5.0,1]=0.0295  odrift2[0.0]=0.0295  ablate_nobalance[0.0001,5.0,1]=0.0306  odrift3[0.25]=0.0354  decay_dr[0.5]=0.0360
+S8@1.0     n=300  best: odrift[0.0001,5.0,1]=0.0068  odrift2[0.0]=0.0068  ablate_nobalance[0.0001,5.0,1]=0.0068  odrift3[0.25]=0.0070  recent_dr[6]=0.0071  monitor_select_dr=0.0071
+wrote /Users/gauris/dev/o-drift/results/03_test3_anchor100.json

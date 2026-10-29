@@ -32,7 +32,7 @@ random-policy Men campaign log at `data/open_bandit_dataset/random/men/men.csv`,
 `configs/protocol.yaml` is the pre-registration: splits and seeds, tuning grids, the tuning
 rule, and the go/no-go criteria of every version (`v2`, `v3`, `v4`, `v5` blocks, each with its
 status and date). Tuning uses development splits only; each test split was run once per
-frozen configuration. `docs/PLAN.md` is the dated decision log (items 1-36), including every
+frozen configuration. `docs/PLAN.md` is the dated decision log (items 1-37), including every
 post-hoc finding and why it was made.
 
 | Version | What changed | Outcome |
@@ -55,11 +55,12 @@ one at a time.
 | Test runs, v3 (Table 2, Table 3, criteria) | `scripts/run_v3_tests.sh` (test3, test3 without anchor, Open Bandit, then the analyses) |
 | Table 2, Table 3, Figure 1 | `scripts/12_paper_tables.py` -> `paper/tables/`, `paper/figures/` |
 | Table 4 (post-hoc revisions) | `scripts/03_evaluate.py --split dev4 --basis select:32`; `scripts/03_evaluate.py --split dev5 --basis select:32 --reps 13 --out results/03_dev5_r13.json`; `scripts/13_revisions_table.py` |
-| Anchor-size sweep (post-hoc) | `scripts/run_v3_anchor_sweep.sh` |
+| Anchor-size sweep (post-hoc, Section 6) | `scripts/run_v3_anchor_sweep.sh`, then `scripts/14_anchor_sweep.py` |
 | Paper PDF | `cd paper && latexmk -pdf main.tex` |
 
 Approximate run times on a 10-core laptop: dev3 3-4 h, test3 5-6 h, test3 without anchor
-1.5 h, Open Bandit 2-2.5 h.
+1.5 h, Open Bandit 2-2.5 h, anchor sweep about 1.5 h at 100 records and 5 h at 10,000
+(of which S3b alone takes about 3.5 h).
 
 ## Layout
 
@@ -67,7 +68,7 @@ Approximate run times on a 10-core laptop: dev3 3-4 h, test3 5-6 h, test3 withou
 src/odrift/        simulator.py, regimes.py (S0-S8b), obd.py (Open Bandit environment),
                    nuisance.py (cross-fitted reward models, bases), monitor.py (residual test),
                    method.py (O-Drift), baselines.py, backtest.py (v5)
-scripts/           01-04 main pipeline; 07 Open Bandit preparation; 12-13 paper tables;
+scripts/           01-04 main pipeline; 07 Open Bandit preparation; 12-14 paper tables and figures;
                    02, 05, 06, 08-11 dev-only diagnostics and prototypes cited in docs/PLAN.md
 configs/           protocol.yaml (pre-registration)
 docs/              PLAN.md (decision log), notes_monitor_invariance.md (Proposition 1 notes)

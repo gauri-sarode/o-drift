@@ -1,0 +1,9 @@
+S0@0.0     n=300  best: minvar_dr=0.0047  decay_dr[0.95]=0.0047  pooled_dr=0.0047  recent_dr[12]=0.0047  balanced_dr=0.0047  monitor_select_dr=0.0047
+S1@2.0     n=300  best: cope[13]=0.0063  odrift[0.0001,5.0,1]=0.0067  odrift2[0.0]=0.0067  odrift3[0.25]=0.0067  tbdecay[0.8]=0.0067  ablate_group[mean,0.0001]=0.0070
+S2@0.0     n=300  best: balanced_dr=0.0043  cope[13]=0.0046  odrift[0.0001,5.0,1]=0.0046  odrift2[0.0]=0.0046  odrift3[0.25]=0.0046  minvar_dr=0.0048
+S3a@1.0    n=300  best: odrift[0.0001,5.0,1]=0.0059  odrift2[0.0]=0.0059  ablate_nobalance[0.0001,5.0,1]=0.0059  recent_dr[6]=0.0059  monitor_select_dr=0.0059  oracle=0.0061
+S3b@1.0    n=300  best: timedr[1]=0.0068  oracle=0.0088  forecast[1]=0.0089  recent_dr[1]=0.0101  decay_dr[0.5]=0.0101  recent_dr[2]=0.0104
+S4@1.0     n=300  best: oracle=0.0104  trecent[8]=0.0109  odrift3[0.25]=0.0111  ablate_group[mean,0.0001]=0.0114  ablate_nobalance[0.0001,5.0,1]=0.0116  odrift[0.0001,5.0,1]=0.0117
+S5@1.0     n=300  best: oracle=0.0083  ablate_mse=0.0112  ablate_bound=0.0116  liu_reg[6]=0.0119  anchor_dr=0.0119  anchor_validated=0.0136
+/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/resource_tracker.py:475: UserWarning: resource_tracker: There appear to be 5 leaked semaphore objects to clean up at shutdown: {'/loky-51081-69m70s90', '/loky-51081-8uym96sf', '/loky-51081-icjbt2xg', '/loky-51081-uokzfcd_', '/loky-51081-gbllr0l8'}
+  warnings.warn(

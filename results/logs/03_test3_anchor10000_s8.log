@@ -1,0 +1,2 @@
+S8@1.0     n=300  best: recent_dr[6]=0.0060  monitor_select_dr=0.0060  odrift[0.0001,5.0,1]=0.0062  odrift2[0.0]=0.0062  oracle=0.0062  ablate_nobalance[0.0001,5.0,1]=0.0062
+wrote /Users/gauris/dev/o-drift/results/03_test3_anchor10000_s8.json

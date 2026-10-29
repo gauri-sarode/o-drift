@@ -486,3 +486,15 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    (up to 2.1x), slightly better in S3b and S0#m3. Paper text corrected accordingly ("every cell" was wrong).
    Paper: title changed by user to "O-Drift: Observability-Aware Off-Policy Evaluation in Evolving
    Recommender Systems"; observability framing added; kept at 12 pages (PAKDD format, venue TBD).
+37. **Anchor-size sweep, POST-HOC (2026-10-29; protocol v3.anchor_sweep_v3; scripts/run_v3_anchor_sweep.sh,
+   scripts/14_anchor_sweep.py -> results/14_anchor_sweep.json, paper/figures/fig_anchor.pdf)**. Frozen v3 on
+   the test3 seeds, eight cells, n_anchor 100 and 10000 (1000 = the original test3, 0 = test3 without anchor).
+   Run note: at n_anchor 10000, S3b took ~3.5 h (other cells ~10 min each); the run was stopped by request
+   after S5 was checkpointed, S8 was rerun alone with --cells S8@1.0 and merged into
+   results/03_test3_anchor10000.json (same grid, seeds and code). RMSE x1e-3 O-Drift at 100/1000/10000:
+   S4 14.2/14.1/11.1 (no anchor 68.5); S3a 9.9/9.8/8.8; S8 7.0/6.9/6.3. Anchor-only DR 153/42/12.
+   Finding: O-Drift barely depends on anchor size (segmentation uses history; 100 rows identify the
+   reference), but under gradual/seasonal drift (S3b, S5) a 10000-row anchor alone beats it (11.9 vs
+   23.5 / 29.3) and its coverage stays <0.30, as reuse bias does not shrink with n_T. Added to the paper
+   as a short post-hoc paragraph (text only; figure kept out for the 12-page limit). Bib venue names
+   abbreviated to stay at 12 pages.
