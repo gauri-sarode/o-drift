@@ -1,13 +1,10 @@
 \section{Introduction}\label{sec:intro}
 
-Recommender and advertising systems decide whether to deploy a new policy by estimating
-its value from logged interactions of the policies that ran before it. Off-policy
-evaluation (OPE) makes this possible when the logs record the propensities of the
-logging policy~\cite{horvitz1952generalization,dudik2011doubly}. In practice the logs
-span many weeks, and the environment does not stand still: users change, the deployed
-logger is replaced, and the click-through behaviour of the same users on the same items
-moves. What a team needs is the value of the candidate policy \emph{now}, in a target
-period for which only a small sample has been collected.
+Recommender systems decide whether to deploy a policy by estimating its value from logs of
+earlier policies, which off-policy evaluation (OPE) allows when the logs record
+propensities~\cite{horvitz1952generalization,dudik2011doubly}. The logs span many weeks while
+users change, loggers are replaced and click behaviour moves; what is needed is the value
+\emph{now}, in a target period with only a small sample.
 
 Pooling all history gives a low-variance estimate that is biased whenever the environment
 has changed; using only the small target sample (the \emph{anchor}) is unbiased but noisy. Existing remedies interpolate

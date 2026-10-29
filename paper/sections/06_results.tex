@@ -5,9 +5,8 @@ All numbers in this section come from the one-shot test runs.
 \input{tables/tab_main}
 
 \paragraph{Simulated regimes.}
-\Cref{tab:main} compares \odrift{} with the best tuned baseline in each cell; note that the
-best baseline differs from cell to cell, so a ratio near one means that \odrift{} matches
-whichever method happens to suit that regime. Without reward drift (S0--S2) \odrift{} is within
+\Cref{tab:main} compares \odrift{} with the best tuned baseline in each cell, which differs
+from cell to cell. Without reward drift (S0--S2) \odrift{} is within
 7\% of the best baseline; the small losses in S0 and S2 are the price of estimating segment
 models that turn out to be unnecessary. Under abrupt and mixed reward drift it wins: by 7\% in
 S3a at the lower intensity and by 14\% and 35\% in S4, with paired intervals that exclude zero.
@@ -15,8 +14,8 @@ In S4 the best baseline changes from balanced DR to transported recent-window DR
 intensity grows, while \odrift{} is best in both. The misspecification-3 cells of S3a, S4,
 S5 and S8 are also won or tied (ratios 0.80--0.99).
 
-The method loses in four places. Gradual reward drift (S3b) violates the piecewise
-assumption and favours the time-aware DR, which models a trend (ratios 1.28 and 3.02).
+It loses in four places. Gradual drift (S3b) violates the piecewise assumption and favours
+the trend-modelling time-aware DR (1.28, 3.02).
 Under abrupt drift at the higher intensity (S3a, intensity 1) \odrift{} loses to
 monitor-select (1.40); here the v1 configuration without offset shrinkage would have won
 (6.5 vs.\ 7.0), so the shrinkage tuned on development data under-corrects large drift.
@@ -37,14 +36,13 @@ mean-reward statistic (same segmentation procedure and threshold grid).}
 \end{figure}
 
 \paragraph{Does the mechanism matter?}
-Two pre-registered checks address this (right half of \cref{tab:main}, \cref{fig:splits}). First, against
-tuned COPE, which groups windows by mean reward, \odrift{} has lower RMSE in all 15 reward-drift
-cells, with ratios from 0.19 to 0.93 and paired intervals that exclude zero, and it ties COPE
-in S0--S2. COPE is better in S6 and S7 (1.07 and 1.30), the two regimes with faulty propensities
-or lost support. The tuned COPE cluster contains all windows, so in practice COPE reduces
-to pooling: grouping by mean reward was not informative enough to beat it. Second, the
+Two pre-registered checks address this (right half of \cref{tab:main}, \cref{fig:splits}).
+Against tuned COPE, which groups windows by mean reward, \odrift{} has lower RMSE in all 15
+reward-drift cells (ratios 0.19--0.93, intervals excluding zero) and ties it in S0--S2; COPE is
+better only in S6 and S7 (1.07, 1.30), the regimes with faulty propensities or lost support. Tuned
+COPE keeps all windows in its cluster, so grouping by mean reward did not beat pooling. The
 grouping ablation keeps the whole \odrift{} pipeline and replaces only the monitor statistic by
-the mean reward (its tuned form). The residual monitor never splits the history when the
+the mean reward. The residual monitor never splits the history when the
 reward is stable (S0--S2, and S6--S7), as \cref{prop:invariance} predicts, whereas the mean-reward
 statistic splits 22--61\% of S1 histories under context drift, 52\% of S2 histories under
 logger switches and every S7 history. These spurious splits shrink the reference segment and
@@ -61,23 +59,25 @@ for the monitor.
 almost all of its error is bias ($+14$ to $+68\times10^{-3}$). The monitor is not the cause: it
 finds the change in every S3a episode, and monitor-select, which uses the same segmentation
 without reuse, is the best method in S3a and within a factor of 1.4 of the best in S4. The failure lies in the correction. The base
-reward is quadratic while the reward models are linear (the basis rule chose linear features
-in every episode), and the injected drift is three times the standard deviation of the base
-logit. The fitted offsets $\delta_j$ then absorb part of the drift and part of the model error,
-and the corrected old segments carry a bias that the anchor cannot see. Offset shrinkage
+reward is quadratic, the reward models linear (the basis rule chose linear features in every
+episode), and the drift three times the standard deviation of the base logit, so the offsets
+$\delta_j$ absorb model error as well as drift and the corrected segments carry a bias the
+anchor cannot observe. Offset shrinkage
 makes this worse (S3a, intensity 1: 36.4 vs.\ 10.0 without shrinkage). The robustness
 criteria R1 and R2 therefore fail. Of the twelve pre-registered criteria, the other ten pass
 (C1--C5 and N1--N2).
 
+\input{tables/tab_revisions}
+
 \paragraph{Can reuse be validated on the data at hand? (post-hoc).}
 After this test we tried, on development data only, two ways to decide per episode whether to
-reuse corrected segments. A gate that drops a segment whose estimate differs from the
-reference (reference segment plus anchor) at the 5\% level removed the bias but raised
-variance so much that \odrift{} lost in S4 ($1.11\times$ the best baseline) and in S4 at
-misspecification 3 ($1.72\times$). A rolling-origin back-test that treats the newest history
-window as a pseudo-target chose among full reuse, shrunk reuse and no reuse, but its
-validation error ($10$--$130\times10^{-3}$) was five to ten times the errors it was meant to
-rank, and it was worse than the best fixed choice in every cell we tried. Neither was taken to a test split. Both failures
-have the cause stated in \cref{sec:setting}: an anchor of 1{,}000 records gives a DR estimate with
-RMSE $42\times10^{-3}$, and a held-out window of 4{,}000 records about half of that, while the
-reuse bias that separates good from bad decisions is around $10\times10^{-3}$.
+reuse corrected segments (\cref{tab:revisions}). A gate (v4) that drops a segment whose estimate
+differs from the reference (reference segment plus anchor) at the 5\% level removes the bias but
+raises the variance, and loses in S4 ($1.32\times$ the best baseline) and in S4 at
+misspecification 3 ($1.61\times$). A rolling-origin back-test (v5) that treats the newest
+history window as a pseudo-target and chooses among full reuse, shrunk reuse and no reuse picks
+each option in roughly a third of the episodes in every cell, including those without drift, and
+is worse than the best fixed version in six of nine cells (up to $2.1\times$). Neither was taken to
+a test split. Both fail for the reason given in \cref{sec:setting}: an anchor of 1{,}000 records
+gives a DR estimate with RMSE $42\times10^{-3}$, and a held-out window of 4{,}000 records about half
+of that, while the reuse bias that separates good from bad decisions is around $10\times10^{-3}$.

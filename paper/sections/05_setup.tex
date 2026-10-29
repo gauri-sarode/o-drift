@@ -33,16 +33,14 @@ logger and reward drift are synthetic. Because the generating model is quadratic
 methods' reward models are misspecified. These data test robustness, not natural drift.
 
 \paragraph{Baselines.}
-All estimators share the reward models and the per-episode basis rule. We compare pooled
-DR; anchor-only DR; sliding-window DR (recent $k$ windows + anchor) and exponentially decayed
-DR~\cite{jagerman2019when}; minimum-variance window pooling; density-ratio transport DR and its
-recent-$k$, decayed and balanced-decayed variants; regression-assisted DR~\cite{liu2023asymptotically};
-SLOPE~\cite{su2020adaptive} and MAGIC~\cite{thomas2016data} over nested recency windows;
-forecasting of per-window values~\cite{thomas2017predictive}; a time-aware DR whose reward model
-includes a polynomial time trend; balanced multiple-logger DR~\cite{agarwal2017effective}; an
-anchor-validated window selector; COPE~\cite{natsubori2025cross} with time windows as domains,
-the anchor as the target domain and the cluster size tuned; and ``monitor-select'', DR on
-the newest monitor segment plus the anchor without reuse.
+All share the reward models and basis rule: pooled, anchor-only, recent-$k$ and decayed
+DR~\cite{jagerman2019when}; minimum-variance pooling; transport DR and its recent, decayed and
+balanced-decayed variants; regression-assisted DR~\cite{liu2023asymptotically};
+SLOPE~\cite{su2020adaptive} and MAGIC~\cite{thomas2016data} over nested windows;
+forecasting~\cite{thomas2017predictive}; time-aware DR (polynomial time trend in the reward
+model); balanced DR~\cite{agarwal2017effective}; an anchor-validated window selector;
+COPE~\cite{natsubori2025cross} (windows as domains, anchor as target, cluster size tuned); and
+monitor-select, DR on the newest monitor segment plus the anchor without reuse.
 
 \paragraph{Protocol.}
 The protocol (\texttt{configs/protocol.yaml} in the code) was fixed before tuning. Every
@@ -59,7 +57,5 @@ R2: ratio at most 1 in at least half of them), two against COPE (N1) and three o
 ablation (N2); their exact wording is in the protocol file.
 
 \paragraph{Metrics.}
-We report RMSE ($\times10^{-3}$), its ratio to the best tuned baseline in each cell with a
-paired bootstrap 95\% interval of the RMSE difference (10{,}000 resamples of episodes),
-coverage of the nominal 95\% interval, and, for the monitor, the share of episodes in which
-the history is split into more than one segment.
+RMSE ($\times10^{-3}$); its ratio to the best tuned baseline with a paired bootstrap 95\%
+interval of the difference (10{,}000 resamples); interval coverage; and the share of episodes split.

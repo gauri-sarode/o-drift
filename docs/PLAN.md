@@ -478,3 +478,11 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    anchor gate (v4): a window is only ~5x the anchor. [corrected 2026-10-29] Finding: with per-window samples of this size no
    data-driven check can detect reuse bias of ~10e-3 (minimal detectable bias ~ 2.8 sd/sqrt(n)), which is
    why every validation-based fix trades the simulator against OBD. v5 not run on dev; test4/real4 unused.
+36. **Revisions table, matched dev episodes (2026-10-29; results/03_dev5_r13.json = dev5 with the first 13
+   data seeds per env, 52 episodes/cell; scripts/13_revisions_table.py -> paper/tables/tab_revisions.tex,
+   results/13_revisions_summary.json)**. RMSE ratio to best tuned baseline v1 / v3 / v4 / v5:
+   S4 0.89 / 0.71 / 1.32 / 1.53; S4#m3 1.32 / 0.94 / 1.61 / 1.79; S1 v5 1.41; S2 v5 1.24. v5 choices are
+   ~1/3 each in every cell (incl. no-drift cells); v5 worse than the best fixed version in 6/9 cells
+   (up to 2.1x), slightly better in S3b and S0#m3. Paper text corrected accordingly ("every cell" was wrong).
+   Paper: title changed by user to "O-Drift: Observability-Aware Off-Policy Evaluation in Evolving
+   Recommender Systems"; observability framing added; kept at 12 pages (PAKDD format, venue TBD).

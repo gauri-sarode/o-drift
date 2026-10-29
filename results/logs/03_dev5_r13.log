@@ -1,0 +1,10 @@
+S0@0.0     n=52  best: minvar_dr=0.0063  odrift[0.0001,5.0,1]=0.0064  odrift2[0.0]=0.0064  odrift2[0.5]=0.0064  odrift2[1.0]=0.0064  odrift2[2.0]=0.0064
+S1@1.0     n=52  best: odrift[0.0001,5.0,1]=0.0067  odrift2[0.0]=0.0067  odrift2[0.5]=0.0067  odrift2[1.0]=0.0067  odrift2[2.0]=0.0067  odrift2[4.0]=0.0067
+S2@0.0     n=52  best: odrift[0.0001,5.0,1]=0.0055  odrift2[0.0]=0.0055  odrift2[0.5]=0.0055  odrift2[1.0]=0.0055  odrift2[2.0]=0.0055  odrift2[4.0]=0.0055
+S3a@0.5    n=52  best: odrift3[0.25]=0.0066  ablate_group[action,0.01]=0.0066  ablate_group[action,0.001]=0.0066  ablate_group[action,0.0001]=0.0066  odrift3[0.5]=0.0068  ablate_group[mean,0.01]=0.0068
+S3b@0.5    n=52  best: oracle=0.0081  odrift5=0.0084  odrift2[2.0]=0.0085  odrift2[1.0]=0.0085  odrift2[4.0]=0.0085  odrift2[0.5]=0.0085
+S4@0.5     n=52  best: ablate_group[mean,0.0001]=0.0083  ablate_group[mean,0.001]=0.0084  odrift3[0.25]=0.0085  ablate_group[mean,0.01]=0.0087  ablate_group[action,0.001]=0.0098  ablate_group[action,0.0001]=0.0098
+S0@0.0#m3.0 n=52  best: ablate_nobalance[0.0001,5.0,1]=0.0050  odrift5=0.0050  odrift[0.0001,5.0,1]=0.0051  odrift2[0.0]=0.0051  odrift2[0.5]=0.0051  odrift2[1.0]=0.0051
+S3a@0.5#m3.0 n=52  best: odrift3[0.1]=0.0058  ablate_group[action,0.01]=0.0060  ablate_group[action,0.001]=0.0060  ablate_group[action,0.0001]=0.0060  odrift3[0.25]=0.0060  odrift3[0.5]=0.0063
+S4@0.5#m3.0 n=52  best: odrift3[0.1]=0.0083  odrift3[0.25]=0.0102  tbdecay[0.8]=0.0109  tbdecay[0.9]=0.0113  tbdecay[0.95]=0.0121  odrift3[0.5]=0.0122
+wrote /Users/gauris/dev/o-drift/results/03_dev5_r13.json

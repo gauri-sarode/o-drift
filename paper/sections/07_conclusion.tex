@@ -1,11 +1,9 @@
 \section{Limitations and Conclusion}\label{sec:conclusion}
 
-\odrift{} rests on two points: for OPE under drift, the age of a window matters less than
-which mechanism changed it, and an estimator should rely on a drift decision only where the data
-can observe that drift. A residual test on the conditional reward, unlike tests on raw
-rewards, does not mistake context or logger drift for reward drift, and in our pre-registered
-evaluation this made the difference between \odrift{} and a cross-domain estimator that groups
-periods by mean reward in every reward-drift setting.
+For OPE under drift, which mechanism changed a window matters more than its age, and a drift
+decision is only as good as the data that can observe it. A residual test on the conditional
+reward does not mistake context or logger drift for reward drift, which in our pre-registered
+evaluation separated \odrift{} from mean-reward grouping in every reward-drift setting.
 
 The limitations are as important as the result. First, drift-corrected reuse depends on the
 reward-drift difference lying in the model class (A4); on semi-synthetic Open Bandit data,

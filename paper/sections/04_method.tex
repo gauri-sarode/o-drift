@@ -75,13 +75,11 @@ difference $\hat q_{\mathrm{ref}}-\hat q_j$ is exactly the fitted reward drift, 
 The anchor DR estimate joins the segment estimates, and the weights
 $\hat\alpha=\arg\min_{\alpha\ge0,\,\mathbf1^\top\alpha=1}\alpha^\top\hat\Sigma\alpha$ minimise
 the estimated variance, where $\hat\Sigma$ accounts for the target contexts shared by
-all direct-method terms. Because a residual bias may remain, we report the
-DerSimonian--Laird interval~\cite{dersimonian1986meta}, which inflates the standard error
-by the between-component heterogeneity $\hat\tau^2$. As a certified alternative we also
-report a sample-split interval with an explicit bias allowance; it is valid but wide.
+all direct-method terms. Because bias may remain, the reported interval is
+DerSimonian--Laird~\cite{dersimonian1986meta}, inflating the standard error by the
+between-component heterogeneity $\hat\tau^2$; a sample-split interval with an explicit bias
+allowance is reported as a certified but wide alternative.
 Without an anchor \odrift{} returns an estimate flagged as not certified.
 
 
-\paragraph{Settings.} $\alpha=10^{-4}$ and $z_{\mathrm{anc}}=5$ were tuned on the development
-split before the first test run; $s=0.25$ was tuned on the development split of the
-pre-registered revision that we test (\cref{sec:setup}).
+\paragraph{Settings.} $\alpha=10^{-4}$, $z_{\mathrm{anc}}=5$ and $s=0.25$ were tuned on development data (\cref{sec:setup}).
