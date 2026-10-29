@@ -173,6 +173,10 @@ v3:
       blind grouping's rate reported next to it; the ablation's RMSE exceeds O-DRIFT's with paired CI
       excluding 0 in S1 or S2; and in no reward-drift cell is the ablation's RMSE <= 0.90 x O-DRIFT
       with CI excluding 0
+  anchor_sweep_v3: >-
+    POST-HOC, added 2026-10-29 at the user's request after the v3 test: the v1 anchor-sweep design
+    (simulator.anchor_sweep_cells, n_anchor 100 and 10000; 0 and 1000 already run) applied to the frozen
+    v3 configuration on the test3 seeds. Descriptive only (no criterion); reported as post-hoc.
   reporting_v3: >-
     v1 and v2 dev results reported as development history; misspec-3 false splits (Claim-1 caveat)
     reported per cell; N1/N2 reported in full even if they fail
