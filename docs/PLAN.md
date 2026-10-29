@@ -460,3 +460,12 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    drift size, tuned on simulator drift, under-corrects OBD's 3x-larger drift. v1 itself still loses
    (ratios ~1.6-2.4 vs monitor_select_dr). monitor_select_dr (our monitor + newest segment only) is the
    best OBD method in S3a/S4 (4.7, 13.5).
+34. **dev4 (2026-10-29; results/03_dev4.json, tuned_v4.json, logs/04_dev4.log)**. Gated reuse, z_gate fixed
+   1.96 (not tuned; dev mean log RMSE 3.0 -4.901, 1.96 -4.866, 1.0 -4.814 vs v1 -4.905, v3 -4.964).
+   odrift4[1.96] / best tuned baseline: S0 1.03, S1 0.99, S2 1.02, S3a 0.86*, S3b 1.14 (CI>0), S4 1.11
+   (v1 was 0.86-ish, v3 0.76), S0#m3 1.06, S3a#m3 0.96, S4#m3 1.72 (CI>0; v1 1.57, v3 1.08).
+   Dev analogues of the frozen criteria FAIL: only one <= 0.9 win (S3a); S4#m3 > 1.5. N1 fails in
+   S4#m3 (1.35x COPE). Mechanism: in gradual drift (S4) the reference is the newest, small segment, so
+   the gate drops useful corrected segments and variance rises (bias -> ~0, sd up). The gate cannot
+   tell OBD-type bias from useful reuse at the anchor/reference sample sizes. v4 NOT taken to test
+   (test4/real4 seeds untouched). Negative result, report as such.
