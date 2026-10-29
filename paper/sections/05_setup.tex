@@ -32,6 +32,18 @@ shifted to a mean click rate of $0.05$; actions, propensities, rewards and the i
 logger and reward drift are synthetic. Because the generating model is quadratic, the
 methods' reward models are misspecified. These data test robustness, not natural drift.
 
+\paragraph{Open Bandit with real rewards.}
+To test natural drift we use every campaign of the dataset (Men, Women, All; 34, 46 and 80
+items) with nothing synthetic. The uniformly random log (0.45--1.37 million impressions over
+seven days) is cut into 19 time blocks of about 8.8 hours. A task takes block $b\in\{12,\dots,18\}$
+as the target and the 12 blocks before it as history (5{,}000 records per window, an anchor of
+1{,}000 and 10{,}000 target contexts drawn from block $b$). The target policy is the Bernoulli
+Thompson Sampling (BTS) policy that ran in the same A/B test, represented by its item
+frequencies per position in block $b$; the ground truth is its on-policy click rate in that
+block (0.2--0.7 million impressions, standard error $\le0.2	imes10^{-3}$). Contexts are 8
+principal components of the user features and the position. As in~\cite{saito2021open},
+interactions between items shown together are ignored. 21 tasks $\times$ 20 episodes.
+
 \paragraph{Baselines.}
 All share the reward models and basis rule: pooled, anchor-only, recent-$k$ and decayed
 DR~\cite{jagerman2019when}; minimum-variance pooling; transport DR and its recent, decayed and
@@ -39,8 +51,12 @@ balanced-decayed variants; regression-assisted DR~\cite{liu2023asymptotically};
 SLOPE~\cite{su2020adaptive} and MAGIC~\cite{thomas2016data} over nested windows;
 forecasting~\cite{thomas2017predictive}; time-aware DR (polynomial time trend in the reward
 model); balanced DR~\cite{agarwal2017effective}; an anchor-validated window selector;
-COPE~\cite{natsubori2025cross} (windows as domains, anchor as target, cluster size tuned); and
-monitor-select, DR on the newest monitor segment plus the anchor without reuse.
+COPE~\cite{natsubori2025cross} (windows as domains, anchor as target, cluster size tuned); OPFV~\cite{shimizu2025offpolicy},
+which importance-weights the records sharing the target's time feature and chooses that feature per
+episode from recency and periodic candidates (including the true seasonal period) by its
+bias--variance rule; and monitor-select, DR on the newest monitor segment plus the anchor without
+reuse. COPE and OPFV follow the estimators of the original papers (their Eqs.~9--10 and 4, 7) with our
+shared reward-model class.
 
 \paragraph{Protocol.}
 The protocol (\texttt{configs/protocol.yaml} in the code) was fixed before tuning. Every
@@ -51,6 +67,8 @@ frozen configuration. The version reported here is the third pre-registered one:
 passed its simulator criteria on separate test seeds but failed on Open Bandit, which led to
 the misspecification-3 cells, the robustness criteria, the per-episode basis, offset
 shrinkage, the COPE baseline and the grouping ablation, all registered before this test run.
+A fourth registration (v6) left the method unchanged and added OPFV, a replication on fresh test
+environments and the real-reward evaluation, with its criteria fixed before either was run.
 Twelve criteria were pre-registered: five on accuracy, coverage, support and abstention (C1--C5),
 two on robustness in the misspecification-3 and Open Bandit cells (R1: no ratio above 1.5;
 R2: ratio at most 1 in at least half of them), two against COPE (N1) and three on the grouping

@@ -9,6 +9,7 @@
 
 import argparse
 import json
+from collections import Counter
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -67,6 +68,27 @@ def split_rate(cell, method):
     return float(np.mean([r[method][0]["n_segments"] > 1 for r in cell["reps"]]))
 
 
+def opfv_checks(data, od, opfv):
+    """Pre-registered v6 criterion N3 (vs OPFV); protocol v6.go_no_go_v6."""
+    rows = {}
+    for key, cell in data["cells"].items():
+        if od not in cell["reps"][0]:
+            continue
+        d, lo, hi = paired_bootstrap(cell, od, opfv)
+        rows[key] = dict(opfv_ratio=rmse(cell, od) / rmse(cell, opfv), opfv_ci=[lo, hi],
+                         opfv_features=dict(Counter(p["chosen"] for r in cell["reps"] for p in r[opfv])))
+    print(f"\nN3 (v6): O-DRIFT/OPFV ({opfv}) RMSE ratio, paired 95% CI x1e3")
+    for key, r in rows.items():
+        print(f"  {key:13s} od/opfv {r['opfv_ratio']:.2f} [{r['opfv_ci'][0] * 1e3:+.2f},{r['opfv_ci'][1] * 1e3:+.2f}]")
+    drift = [k for k in rows if k.split("@")[0] in REWARD_DRIFT]
+    stat = [k for k in rows if k.split("@")[0] in NO_REWARD_DRIFT and "#m" not in k]
+    beat = [k for k in drift if rows[k]["opfv_ci"][1] < 0]
+    go = [(f"N3: beats OPFV (CI<0) in >= half of reward-drift cells ({len(beat)}/{len(drift)})",
+           bool(drift) and 2 * len(beat) >= len(drift)),
+          ("N3: <= 1.10x OPFV in S0/S1/S2", bool(stat) and all(rows[k]["opfv_ratio"] <= 1.10 for k in stat))]
+    return go, rows
+
+
 def novelty_checks(data, od, cope, abl):
     """Pre-registered v3 criteria N1 (vs tuned COPE) and N2 (grouping ablation); protocol v3.go_no_go_v3."""
     go, rows = [], {}
@@ -91,7 +113,7 @@ def novelty_checks(data, od, cope, abl):
     go.append((f"N1: beats COPE (CI<0) in >= half of reward-drift cells ({len(beat)}/{len(drift)})",
                bool(drift) and 2 * len(beat) >= len(drift)))
     go.append(("N1: <= 1.10x COPE in S0/S1/S2", bool(stat) and all(rows[k]["cope_ratio"] <= 1.10 for k in stat)))
-    go.append((f"N2: monitor false-split rate <= 0.05 in S0/S1/S2 (max {max(rows[k]['split_od'] for k in stat):.2f})",
+    go.append((f"N2: monitor false-split rate <= 0.05 in S0/S1/S2 (max {max((rows[k]['split_od'] for k in stat), default=float('nan')):.2f})",
                all(rows[k]["split_od"] <= 0.05 for k in stat)))
     worse = [k for k in stat if k.split("@")[0] in ("S1", "S2") and rows[k]["abl_ci"][0] > 0]
     go.append((f"N2: ablation worse than O-DRIFT (CI>0) in S1 or S2 ({worse})", bool(worse)))
@@ -155,12 +177,12 @@ def print_table(rows):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--split", choices=["dev", "test", "dev2", "test2", "obd2", "dev3", "test3", "obd3", "dev4", "test4", "obd4", "dev5", "test5", "obd5"], required=True)
+    ap.add_argument("--split", choices=["dev", "test", "dev2", "test2", "obd2", "dev3", "test3", "obd3", "dev4", "test4", "obd4", "dev5", "test5", "obd5", "test6"], required=True)
     ap.add_argument("--file", default=None)
     ap.add_argument("--tuned", default=None, help="tuned-parameter file (default by split version)")
     args = ap.parse_args()
     data = json.loads((ROOT / (args.file or f"results/03_{args.split}.json")).read_text())
-    ver = args.split[-1] if args.split[-1] in "2345" else ""
+    ver = args.split[-1] if args.split[-1] in "23456" else ""
     v2 = bool(ver)  # v2 and v3 share the reporting (method under test = odrift2[tuned lam]; lam 0 = v1)
     tuned_path = ROOT / (args.tuned or f"results/tuned{'_v' + ver if ver else ''}.json")
 
@@ -183,11 +205,11 @@ def main():
     od1 = od
     if v2:  # the method under test is v2 (v3: odrift3); v1 (same fits) is reported alongside
         od = {"5": "odrift5", "4": name("odrift4", "odrift4") if "odrift4" in tuned else None,
-              "3": name("odrift3", "odrift3")}.get(ver) or name("odrift2", "odrift2")
+              "3": name("odrift3", "odrift3"), "6": name("odrift3", "odrift3")}.get(ver) or name("odrift2", "odrift2")
     tuned_baselines = ["pooled_dr", "anchor_dr", name("recent", "recent_dr"), name("decay", "decay_dr"),
                        "minvar_dr", name("liu", "liu_reg"), "transport_dr"]
     for fam, prefix in (("slope", "slope"), ("magic", "magic"), ("trecent", "trecent"), ("tdecay", "tdecay"),
-                        ("forecast", "forecast"), ("timedr", "timedr"), ("tbdecay", "tbdecay"), ("cope", "cope")):
+                        ("forecast", "forecast"), ("timedr", "timedr"), ("tbdecay", "tbdecay"), ("cope", "cope"), ("opfv", "opfv")):
         if fam in tuned:
             tuned_baselines.append(name(fam, prefix))
     tuned_baselines += ["anchor_validated", "balanced_dr", "monitor_select_dr"]
@@ -243,13 +265,18 @@ def main():
               + f" ; bias {eo.mean() * 1e3:+.1f} sd {eo.std() * 1e3:.1f}")
 
     novelty = None
-    if ver in ("3", "4", "5") and not args.split.startswith("obd"):
+    if ver in ("3", "4", "5", "6") and not args.split.startswith("obd"):
         novelty, novelty_rows = novelty_checks(data, od, name("cope", "cope"), name("ogroup", "ablate_group"))
+        if ver == "6":  # protocol v6: N3 vs OPFV
+            n3, n3_rows = opfv_checks(data, od, name("opfv", "opfv"))
+            novelty += n3
+            for k, r in n3_rows.items():
+                novelty_rows.setdefault(k, {}).update(r)
         if args.split == "dev3":
             for crit, ok in novelty:
                 print(f"  [dev preview {'PASS' if ok else 'FAIL'}] {crit}")
 
-    if args.split in ("test", "test2", "test3"):
+    if args.split in ("test", "test2", "test3", "test6"):
         go = []
         main_cells = {k: v for k, v in summary.items() if "#m" not in k}  # v2: v1 criteria on misspec-0.5 cells
         full_summary, summary = summary, main_cells
@@ -278,7 +305,9 @@ def main():
         if v2:  # pre-registered robustness criterion (protocol v2.go_no_go_v2)
             robust = {k: summary[k]["ratio"] for k in summary if "#m" in k and k.split("@")[0] in ("S3a", "S4", "S5", "S8")}
             obd2 = ROOT / f"results/04_obd{ver}_summary.json"
-            if obd2.exists():
+            if ver == "6":
+                pass  # protocol v6: misspec-3 cells only, no OBD semi-synthetic run
+            elif obd2.exists():
                 robust.update({f"obd2:{k}": v["ratio"] for k, v in json.loads(obd2.read_text())["summary"].items()
                                if k.split("@")[0] in ("S3a", "S4", "S5")})
             else:

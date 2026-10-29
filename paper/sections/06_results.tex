@@ -25,18 +25,9 @@ heterogeneity-inflated interval undercovers whenever bias remains, most severely
 S3b (0.22--0.63); the certified sample-split interval covers in every regime but is about
 18 times wider.
 
-\begin{figure}[t]\centering
-\begin{minipage}[c]{0.46\linewidth}\includegraphics[width=\linewidth]{figures/fig_splits.pdf}\end{minipage}\hfill
-\begin{minipage}[c]{0.5\linewidth}
-\caption{Share of test episodes in which the history is split into more than one segment, in
-regimes without reward drift, for the residual monitor (zero in every cell) and for the
-mean-reward statistic (same segmentation procedure and threshold grid).}
-\label{fig:splits}
-\end{minipage}
-\end{figure}
 
 \paragraph{Does the mechanism matter?}
-Two pre-registered checks address this (right half of \cref{tab:main}, \cref{fig:splits}).
+Two pre-registered checks address this (right half of \cref{tab:main}).
 Against tuned COPE, which groups windows by mean reward, \odrift{} has lower RMSE in all 15
 reward-drift cells (ratios 0.19--0.93, intervals excluding zero) and ties it in S0--S2; COPE is
 better only in S6 and S7 (1.07, 1.30), with faulty propensities or lost support. The
@@ -65,11 +56,26 @@ anchor cannot observe. Offset shrinkage
 makes this worse (S3a, intensity 1: 36.4 vs.\ 10.0 without shrinkage). Robustness criteria R1--R2
 therefore fail; the other ten pre-registered criteria (C1--C5, N1--N2) pass.
 
-\input{tables/tab_revisions}
+\input{tables/tab_real}
+
+\paragraph{Real rewards and natural drift.}
+On the real-reward Open Bandit test (\cref{tab:real}) the click rate of the target policy moves
+between blocks (from 4.1 to $8.0\times10^{-3}$), but these changes are smaller than the error
+of any estimator at these sample sizes. As registered in advance, the monitor almost never
+splits (0.7\% of episodes) and pooling everything is close to optimal: tuned COPE, whose
+cluster spans all windows, is best overall. \odrift{} is within the registered margin
+(ratio 1.05, task-bootstrap interval 1.01--1.09; criterion E1 passed), is the most accurate
+method on the 80-item campaign (0.97, 0.94--0.99) and is 10\% behind on Men. The
+offset shrinkage of v3 matters here: without it, \odrift{} has RMSE $3.56\times10^{-3}$ on
+Men. Methods that weight time strongly lose: OPFV, whose rule picks fine time features, has
+four times the error of pooling. Its interval covers in 75\% of episodes. In 4 of 420
+episodes the anchor contained no click; its plug-in variance is then zero and the
+minimum-variance pooling of \odrift{} and of the transport baselines is undefined. These
+episodes are excluded for every method; a variance floor would fix this.
 
 \paragraph{Can reuse be validated on the data at hand? (post-hoc).}
 After this test we tried, on development data only, two ways to decide per episode whether to
-reuse corrected segments (\cref{tab:revisions}). A gate (v4) that drops a segment whose estimate
+reuse corrected segments (52 matched episodes per cell). A gate (v4) that drops a segment whose estimate
 differs from the reference (reference segment plus anchor) at the 5\% level removes the bias but
 raises the variance, and loses in S4 ($1.32\times$ the best baseline) and in S4 at
 misspecification 3 ($1.61\times$). A rolling-origin back-test (v5) treats the newest
