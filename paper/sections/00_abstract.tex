@@ -1,8 +1,8 @@
 \begin{abstract}
 Off-policy evaluation for the current period must often rely on logs collected over many
-earlier periods, with only a small sample from the period itself. The usual remedies for
-non-stationarity, recency windows, decay and forecasting, treat every change in the logs
-alike, so they discard data that is still informative. We argue that the useful question
+earlier periods, with only a small sample from the period itself. Common remedies
+(recency windows, decay, forecasting) treat every change alike and discard data that is
+still informative. We argue that the useful question
 is not how recent a period is but which mechanism changed: a change in the context
 distribution or in the logging policy can be corrected by reweighting, while only a
 change in the conditional reward biases a reweighted estimate. We propose O-DRIFT, which

@@ -55,7 +55,10 @@ added the misspecification-3 cells and the robustness criterion, and the third v
 added the per-episode basis, offset shrinkage, the COPE baseline and the grouping ablation.
 All of these changes were registered before the test run reported here, and their results
 are labelled as post-hoc where they were informed by earlier tests.
-The pre-registered criteria are listed in \cref{tab:criteria}.
+Twelve criteria were pre-registered: five on accuracy, coverage, support and abstention (C1--C5),
+two on robustness in the misspecification-3 and Open Bandit cells (R1: no ratio above 1.5;
+R2: ratio at most 1 in at least half of them), two against COPE (N1) and three on the grouping
+ablation (N2); their exact wording is in the protocol file.
 
 \paragraph{Metrics.}
 We report RMSE ($\times10^{-3}$), its ratio to the best tuned baseline in each cell with a

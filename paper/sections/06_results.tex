@@ -27,19 +27,15 @@ S3b (0.22--0.63); the certified sample-split interval covers in every regime but
 18 times wider.
 
 \begin{figure}[t]\centering
-\includegraphics[width=0.49\linewidth]{figures/fig_ratios.pdf}\hfill
-\includegraphics[width=0.49\linewidth]{figures/fig_splits.pdf}
-\caption{Left: RMSE ratio of O-DRIFT to the best tuned baseline and to tuned COPE in each
-test cell (log scale). Right: share of test episodes in which the history is split into more
-than one segment, in regimes without reward drift, for the residual monitor and for the
-mean-reward statistic (same segmentation procedure, same threshold grid).}
-\label{fig:novelty}
+\includegraphics[width=0.48\linewidth]{figures/fig_splits.pdf}
+\caption{Share of test episodes in which the history is split into more than one segment, in
+regimes without reward drift, for the residual monitor (zero in every cell) and for the
+mean-reward statistic (same segmentation procedure and threshold grid).}
+\label{fig:splits}
 \end{figure}
 
-\input{tables/tab_novelty}
-
 \paragraph{Does the mechanism matter?}
-Two pre-registered checks address this (\cref{tab:novelty,fig:novelty}). First, against
+Two pre-registered checks address this (right half of \cref{tab:main}, \cref{fig:splits}). First, against
 tuned COPE, which groups windows by mean reward, O-DRIFT has lower RMSE in all 15 reward-drift
 cells, with ratios from 0.19 to 0.93 and paired intervals that exclude zero, and it ties COPE
 in S0--S2. COPE is better in S6 and S7 (1.07 and 1.30), the two regimes with faulty propensities
@@ -68,9 +64,8 @@ in every episode), and the injected drift is three times the standard deviation 
 logit. The fitted offsets $\delta_j$ then absorb part of the drift and part of the model error,
 and the corrected old segments carry a bias that the anchor cannot see. Offset shrinkage
 makes this worse (S3a, intensity 1: 36.4 vs.\ 10.0 without shrinkage). The robustness
-criteria (R1, R2 in \cref{tab:criteria}) therefore fail.
-
-\input{tables/tab_criteria}
+criteria R1 and R2 therefore fail. Of the twelve pre-registered criteria, the other ten pass
+(C1--C5 and N1--N2).
 
 \paragraph{Can reuse be validated on the data at hand? (post-hoc).}
 After this test we tried, on development data only, two ways to decide per episode whether to

@@ -1,6 +1,6 @@
 \section{Method}\label{sec:method}
 
-O-DRIFT has four steps (\cref{alg:odrift}): segment the history by reward drift, fit joint
+O-DRIFT has four steps: segment the history by reward drift, fit joint
 reward models, form one drift-corrected estimate per segment, and pool them with the anchor.
 
 \subsection{A reward-drift monitor}
@@ -29,7 +29,7 @@ because $P_k(x\mid a)\propto P_k(x)\mu_k(a\mid x)$ only reweights a function tha
 identically zero. Only $q_k\neq q$ moves $m_B(a)$. In contrast,
 $\mathbb{E}[R\mid k]=\sum_a\int P_k(x)\mu_k(a\mid x)q(x,a)\,dx$ changes with $P_k$ and
 $\mu_k$ when $q$ is fixed, which gives false alarms; and a reward change can be cancelled
-by an opposite context or logger change, which gives missed drift. The per-action raw
+by an opposite change of context or logger, which gives missed drift. The per-action raw
 mean $\mathbb{E}_{P_k(x\mid a)}[q(x,a)]$ removes the action mix but still depends on
 $P_k$ and on $\mu_k$ as a function of $x$.
 \end{proof}
@@ -79,17 +79,6 @@ by the between-component heterogeneity $\hat\tau^2$. As a certified alternative 
 report a sample-split interval with an explicit bias allowance; it is valid but wide.
 Without an anchor O-DRIFT returns an estimate flagged as not certified.
 
-\begin{algorithm}[t]
-\caption{O-DRIFT for one target policy $\pi$}\label{alg:odrift}
-\begin{algorithmic}[1]
-\Require windows $\mathcal{D}_1..\mathcal{D}_K$, anchor $\mathcal{D}_T$, target contexts $x^*_{1..M}$, loggers $\mu_k$
-\State Fit pooled $\tilde q$; segment the history by \eqref{eq:monitor} at level $\alpha$ $\to S_1,\dots,S_J$
-\State Choose the context basis by held-out log-loss; fit joint models $\hat q_j$ with offset scale $s$
-\State Choose the reference segment with the anchor test ($z_{\mathrm{anc}}$)
-\State For each segment compute $\hat V_j$ by \eqref{eq:segment}; compute the anchor DR estimate
-\State Pool at minimum variance; return $\hat V$ and the DerSimonian--Laird interval
-\end{algorithmic}
-\end{algorithm}
 
 \paragraph{Settings.} $\alpha=10^{-4}$ and $z_{\mathrm{anc}}=5$ were tuned on the development
 split before the first test run; $s=0.25$ was tuned on the development split of the
