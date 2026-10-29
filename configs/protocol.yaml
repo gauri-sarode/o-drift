@@ -100,6 +100,12 @@ splits:
     regimes: {S0: [0.0], S2: [0.0], S3a: [0.5, 1.0], S4: [0.5, 1.0], S5: [1.0]}
     env_seeds: [410, 411, 412, 413]
     data_seeds: {start: 45000, count: 50}
+  real6:  # v6 one-shot REAL-reward Open Bandit test (src/odrift/obd_real.py); never run before freezing v6
+    # env seed = 100 * campaign index (men 0, women 1, all 2) + target block; blocks are 19 equal-count time
+    # blocks of the random log (~8.8 h each, 24-30 Nov 2019); history = the 12 preceding blocks
+    env_seeds: [12, 13, 14, 15, 16, 17, 18, 112, 113, 114, 115, 116, 117, 118, 212, 213, 214, 215, 216, 217, 218]
+    data_seeds: {start: 70000, count: 20}  # per task: subsamples of history windows, anchor, target contexts
+    regimes: {REAL: [0.0]}
 
 v2:
   misspec_high: 3.0   # nonlinear share of base-logit variance 0.43 (0.37-0.49 over dev envs) = OBD's 0.41;
@@ -280,4 +286,54 @@ v5:
   go_no_go_v5: >-
     to be written after dev5 and before any test5/obd5 run; proposed: the v3 list unchanged (five core
     criteria, go_no_go_v2 robustness on misspec-3 + obd5, N1, N2), method under test odrift5
+
+v6:
+  status: FROZEN  # 2026-10-29, before any test6/real6 result; under the user instruction "do everything make a strong paper"; smoke runs only on dev seeds (dev6) and on one real task with errors suppressed
+  opened: 2026-10-29  # user: "do everything make a strong paper"; reviewers of the user's earlier papers
+                      # criticised simple baselines, so v6 adds a faithful recent baseline and real rewards
+  purpose: >-
+    replication, not a revision: the method under test is the FROZEN v3 configuration, unchanged
+    (odrift3[0.25] with every v3 setting and results/tuned_v3.json). v6 adds (i) OPFV as a baseline,
+    (ii) a second one-shot simulator test on fresh seeds (test6 = splits.test4, never run), and (iii) a
+    one-shot evaluation on real rewards and naturally occurring drift (real6). v4/v5 are not involved.
+  opfv: >-
+    OPFV (Shimizu et al., KDD 2025, Eq. 4): records whose time feature equals the target's are importance
+    weighted (weight 1/p(phi(T))), plus a time-aware reward regression evaluated at the target time on the
+    target contexts (baselines.opfv). Time feature chosen per episode by their Eq. 7 (squared bias against
+    the finest feature + variance) from a fixed candidate set: recency {0, 1, 2, 3, 6, 12} windows and
+    periods {2, 3, 4, 6} windows (6 = the simulator's seasonal period, i.e. the right calendar feature is
+    available to OPFV). Regressor = baselines.fit_time_reward.
+  opfv_degree: 1  # FIXED a priori = the dev3-tuned degree of the time-aware DR baseline (same regressor);
+                  # nothing else in OPFV is tuned, so no dev run is needed (dev6 is a code smoke test only)
+  tuned: "results/tuned_v6.json = results/tuned_v3.json plus opfv 1"
+  real6_design: >-
+    Open Bandit, all three campaigns, uniform-random log (contexts, items, clicks real; propensity 1/n_items).
+    Task (campaign, target block b), b = 12..18: history = blocks b-12..b-1, each subsampled to n_per_window
+    = 5000; anchor = 1000 and target contexts = 10000 disjoint random rows of block b. Evaluation policy
+    pi_b(a | position) = BTS's item frequencies per position in block b's time span (BTS log, same A/B
+    test); ground truth = BTS's on-policy click rate in that span (~0.2-0.7 million impressions per block,
+    se <= 0.2e-3). Oracle uses BTS click rates of the history blocks as V_{T<-k} (approximate). Basis rule
+    of v3. 21 tasks x 20 data seeds = 420 episodes. Caveats stated in the paper: BTS shows slates, so
+    position effects of the other items are ignored (as in Saito et al. 2021); one evaluation policy per task.
+  go_no_go_v6:  # written 2026-10-29 before any v6 result
+    - >-
+      test6 (simulator, misspec 0.5 cells): the five core criteria C1-C5 unchanged, with OPFV added to the
+      baselines that "best tuned baseline" ranges over
+    - test6 misspec-3.0 cells: the go_no_go_v2 robustness criterion (R1, R2) unchanged; no OBD semi-synthetic run in v6
+    - test6: N1 (vs COPE) and N2 (grouping ablation) unchanged
+    - >-
+      N3 (vs OPFV): O-DRIFT RMSE < OPFV with paired 95% CI excluding 0 in >= half of the test6 reward-drift
+      cells (S3a, S3b, S4, S5, S8, S8b; every intensity, misspec 0.5 and 3.0), and <= 1.10 x OPFV in S0, S1, S2
+    - >-
+      E1 (real rewards, real6): O-DRIFT RMSE over all 420 episodes <= 1.10 x the best tuned baseline;
+      paired bootstrap over the 21 tasks (cluster resampling). E2: same per campaign, reported. E3: interval
+      coverage reported against the BTS truth (no threshold: truth itself has se up to 0.2e-3).
+  expectation_real6: >-
+    written before any real6 result: with click rates of 0.3-0.7% and 5000 records per window, reward drift
+    between 8.8-hour blocks is probably below the monitor's detection threshold; we expect few splits and
+    O-DRIFT close to pooled / balanced DR. Reported whatever happens.
+  reporting_v6: >-
+    every criterion reported in full even if it fails; test3 results remain the primary simulator result,
+    test6 is reported as a replication; real6 RMSE also given as a noise-corrected value
+    sqrt(max(MSE - mean truth variance, 0)).
 

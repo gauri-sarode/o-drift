@@ -257,3 +257,45 @@ def cope_cluster(data: LoggedData, K: int, size: int) -> np.ndarray:
     h[K] = 1.0
     h[order[:max(size - 1, 0)]] = 1.0
     return h
+
+
+def opfv_features(K: int, recency: tuple = (0, 1, 2, 3, 6, 12), periods: tuple = (2, 3, 4, 6)) -> dict:
+    """Candidate time-feature functions for OPFV, as masks over window indices 0..K (K = target).
+
+    'recent{m}': phi(t) = 1{t >= K - m} (m = 0 is the finest feature: the target period only);
+    'period{p}': phi(t) = (K - t) mod p, i.e. windows in phase with the target under period p.
+    Returns {name: boolean array of length K + 1 marking windows that share the target's feature}.
+    """
+    t = np.arange(K + 1)
+    feats = {f"recent{m}": t >= K - m for m in recency}
+    feats.update({f"period{p}": (K - t) % p == 0 for p in periods})
+    return feats
+
+
+def opfv(data: LoggedData, q_own: np.ndarray, q_tgt: np.ndarray, X_target: np.ndarray, pi,
+         K: int, features: dict) -> tuple:
+    """OPFV (Shimizu et al., KDD 2025, Eq. 4) with the data-driven time-feature choice of their Eq. 7.
+
+    V(phi) = mean_i [ 1{phi(t_i) = phi(T)} / p(phi(T)) * rho_i (r_i - f(x_i, t_i, a_i)) ] + DM term,
+    where p(phi(T)) is the share of records sharing the target's feature, so the first term is the
+    mean residual over those records; f is the time-aware reward model (fit_time_reward) and the
+    DM term is E_pi f(x, T, .) over the target contexts (the paper averages over logged contexts;
+    target contexts are available here and only help). phi is chosen by
+    argmin (V(phi) - V(phi_finest))^2 + Var(phi), phi_finest = 'recent0'.
+    Returns (Estimate, chosen feature name).
+    """
+    rho = importance_weights(data, pi.probs(data.X))
+    resid = rho * (data.R - q_own)
+    dm = (pi.probs(X_target) * q_tgt).sum(axis=1)
+    dm_mean, dm_var = float(dm.mean()), float(dm.var(ddof=1) / len(dm))
+    est = {}
+    for name, in_phase in features.items():
+        match = in_phase[data.window]
+        if match.sum() < 2:
+            continue
+        r = resid[match]
+        est[name] = (dm_mean + float(r.mean()), dm_var + float(r.var(ddof=1) / len(r)), int(match.sum()))
+    v_fine = est["recent0"][0]
+    chosen = min(est, key=lambda n: (est[n][0] - v_fine) ** 2 + est[n][1])
+    v, var, n = est[chosen]
+    return Estimate(v, float(np.sqrt(var)), n), chosen

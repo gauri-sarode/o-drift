@@ -22,7 +22,7 @@ import numpy as np
 import yaml
 
 from odrift import baselines as bl
-from odrift import obd
+from odrift import obd, obd_real
 from odrift.method import (ODriftConfig, build_components, combine, covariance, fit_all_nuisances,
                            make_corrected_split, odrift_balanced, ratio_function, odrift_corrected, odrift_corrected_split,
                            select_weights)
@@ -38,10 +38,12 @@ SIM, TUNE, V2 = PROTOCOL["simulator"], PROTOCOL["tuning"], PROTOCOL["v2"]
 SPLIT_KEY = {"dev": "dev", "test": "test", "obd": "real", "dev2": "dev2", "test2": "test2", "obd2": "real2",
              "dev3": "dev2", "test3": "test2", "obd3": "real2",  # v3 reuses the v2 seeds (test2/real2 never run)
              "dev4": "dev2", "test4": "test4", "obd4": "real4",  # v4: fresh test seeds
-             "dev5": "dev2", "test5": "test4", "obd5": "real4"}  # v5: v4 never reached test, so test4/real4 unused
+             "dev5": "dev2", "test5": "test4", "obd5": "real4",  # v5: v4 never reached test, so test4/real4 unused
+             "dev6": "dev2", "test6": "test4", "real6": "real6"}  # v6: frozen v3 replication + OPFV + real rewards
 V3 = PROTOCOL["v3"]
 V4 = PROTOCOL["v4"]
 V5 = PROTOCOL.get("v5", {})
+V6 = PROTOCOL.get("v6", {})
 V4_GATE_GRID = [1.0, 1.96, 3.0]  # dev4 reporting only; protocol v4.z_gate is fixed
 CFG = ODriftConfig(delta_variance=TUNE["delta_split"]["variance"], delta_bias=TUNE["delta_split"]["bias"],
                    **TUNE["odrift_fixed"])
@@ -49,6 +51,8 @@ Z95 = 1.959964
 
 
 def make_env(seed, dataset="sim", misspec=None):
+    if dataset == "real":
+        return obd_real.RealEnv.sample(seed)
     if dataset == "obd":
         return obd.OBDEnv.sample(seed)
     return EnvParams.sample(seed, d=SIM["d"], n_actions=SIM["n_actions"],
@@ -61,18 +65,31 @@ def cell_key(regime_name, intensity, misspec):
 
 
 def make_episode(env, regime, n_anchor, seed, dataset="sim"):
+    if dataset == "real":
+        return obd_real.sample_episode(env, regime.n_windows, SIM["n_per_window"], n_anchor,
+                                       SIM["n_target_contexts"], seed)
     sampler = obd.sample_episode if dataset == "obd" else sample_episode
     return sampler(env, regime, SIM["n_per_window"], n_anchor, SIM["n_target_contexts"], seed=seed)
 
 
+def get_regime(regime_name, intensity):
+    if regime_name == "REAL":
+        return obd_real.regime(SIM["n_windows"])
+    return REGIMES[regime_name](intensity, K=SIM["n_windows"])
+
+
 def policies(env, env_seed):
+    if isinstance(env, obd_real.RealEnv):
+        return [obd_real.policy(env)]
     noises = PROTOCOL["splits"]["real"]["candidate_policies"] if isinstance(env, obd.OBDEnv) else TUNE["candidate_policies"]
     return [Policy.near_optimal(env, noise=s, seed=env_seed) for s in noises]
 
 
 def truths_for(regime_name, intensity, env_seed, dataset="sim", misspec=None):
     env = make_env(env_seed, dataset, misspec)
-    regime = REGIMES[regime_name](intensity, K=SIM["n_windows"])
+    regime = get_regime(regime_name, intensity)
+    if dataset == "real":  # BTS on-policy click rates (scripts/15_prepare_obd_real.py)
+        return obd_real.truths(env, regime.n_windows)
     out = []
     for pi in policies(env, env_seed):
         if dataset == "obd":  # exact over all real target-block contexts
@@ -100,11 +117,11 @@ def method_grid(split, tuned):
         "timedr": TUNE["baseline_grids"]["time_dr_degree"],
         "tbdecay": TUNE["baseline_grids"]["transport_balanced_decay"],
     }
-    if split in ("dev2", "test2", "dev3", "test3", "dev4", "test4", "dev5", "test5"):  # v2: v1's tuned O-DRIFT kept for comparison + the reuse_lam family
+    if split in ("dev2", "test2", "dev3", "test3", "dev4", "test4", "dev5", "test5", "dev6", "test6"):  # v2: v1's tuned O-DRIFT kept for comparison + the reuse_lam family
         fx = V2["fixed_from_v1"]
         grid["odrift"] = [(fx["monitor_alpha"], fx["z_anchor"], int(fx["joint_segments"]))]
         grid["odrift2"] = V2["reuse_lam_grid"]
-    if split in ("dev3", "test3", "dev4", "test4", "dev5", "test5"):  # v3: COPE baseline + grouping ablation (mechanism-blind statistics)
+    if split in ("dev3", "test3", "dev4", "test4", "dev5", "test5", "dev6", "test6"):  # v3: COPE baseline + grouping ablation (mechanism-blind statistics)
         grid["cope"] = V3["cope_size_grid"]
         grid["odrift3"] = V3["offset_scale_grid"]
         grid["ogroup"] = [(k, a) for k in V3["grouping_kinds"] for a in TUNE["odrift_grid"]["monitor_alpha"]]
@@ -112,7 +129,9 @@ def method_grid(split, tuned):
         grid["odrift4"] = V4_GATE_GRID
     if split in ("dev5", "test5"):  # v5: back-test choice among fixed candidates (nothing tuned)
         grid["odrift5"] = [V5["shrink"]]
-    if split in ("test", "test2", "test3", "test4", "test5"):
+    if split in ("dev6", "test6"):  # v6: OPFV (Shimizu et al., KDD 2025); regressor degree fixed by protocol v6
+        grid["opfv"] = [V6["opfv_degree"]]
+    if split in ("test", "test2", "test3", "test4", "test5", "test6"):
         full = {k: grid[k] for k in ("recent", "decay")}  # for oracle-tuned upper bounds only
         grid = {fam: [tuple(tuned[fam]) if isinstance(tuned[fam], list) else tuned[fam]] for fam in grid}
         grid.update(full)
@@ -124,7 +143,7 @@ def method_grid(split, tuned):
 def run_one(args):
     regime_name, intensity, env_seed, data_seed, n_anchor, truths, grid, dataset, misspec = args
     env = make_env(env_seed, dataset, misspec)
-    regime = REGIMES[regime_name](intensity, K=SIM["n_windows"])
+    regime = get_regime(regime_name, intensity)
     pis = policies(env, env_seed)
     ep = make_episode(env, regime, n_anchor, data_seed, dataset)
     basis = tuple(grid.get("basis", ("linear", 0)))
@@ -175,7 +194,8 @@ def run_one(args):
                 mixture += counts[k] / counts.sum() * mu(env, art, pooled_d.X)
     if has_anchor:
         # drift-specific baselines: time-aware reward models; composite transport+balanced+decay
-        time_q = {deg: bl.fit_time_reward(pooled_d, K, ep.target_contexts, A, deg, data_seed) for deg in grid["timedr"]}
+        time_q = {deg: bl.fit_time_reward(pooled_d, K, ep.target_contexts, A, deg, data_seed)
+                  for deg in sorted(set(grid["timedr"]) | set(grid.get("opfv", [])))}
         q_pool_own, q_pool_tgt = crossfit_rewards(pooled_d, A, seed=data_seed, extra_X=ep.target_contexts)
         ratio_fns = [ratio_function(d.X, ep.target_contexts) for d in ep.history] + [None]
         tgt_art = regime.target if regime.target.recorded_logger_id is None else \
@@ -295,6 +315,9 @@ def run_one(args):
         for deg in grid["timedr"]:
             e = bl.time_aware_dr(pooled, *time_q[deg], ep.target_contexts, pi)
             put(f"timedr[{deg}]", e.value, Z95 * e.se)
+        for deg in grid.get("opfv", []):
+            e, chosen = bl.opfv(pooled, *time_q[deg], ep.target_contexts, pi, K, bl.opfv_features(K))
+            put(f"opfv[{deg}]", e.value, Z95 * e.se, chosen=chosen)
         for g in grid["tbdecay"]:
             e = bl.transport_balanced_decay_dr(pooled, q_pool_own, q_pool_tgt, ep.target_contexts, pi, K, g,
                                                logger_fns_all, ratio_fns)
@@ -422,20 +445,22 @@ def main():
     ap.add_argument("--basis", default="linear:0", help="reward-model context basis, e.g. rff:32")
     ap.add_argument("--out", default=None, help="output path (default results/03_{split}[_anchorN].json)")
     args = ap.parse_args()
-    dataset = "obd" if args.split.startswith("obd") else "sim"
+    dataset = "obd" if args.split.startswith("obd") else "real" if args.split.startswith("real") else "sim"
     split = PROTOCOL["splits"][SPLIT_KEY[args.split]]
-    ver = args.split[-1] if args.split[-1] in "2345" else ""
+    ver = args.split[-1] if args.split[-1] in "23456" else ""
     tuned = None
-    if args.split in ("test", "obd", "test2", "obd2", "test3", "obd3", "test4", "obd4", "test5", "obd5"):  # frozen config only; OBD is never tuned on
+    if args.split in ("test", "obd", "test2", "obd2", "test3", "obd3", "test4", "obd4", "test5", "obd5", "test6", "real6"):  # frozen config only; OBD is never tuned on
         assert PROTOCOL["status"] == "FROZEN", "protocol must be frozen before touching test"
         if ver == "3":
             assert V3.get("status") == "FROZEN", "v3 must be pre-registered (v3.status FROZEN) before touching test3/obd3"
         if ver == "5":
             assert V5.get("status") == "FROZEN", "v5 must be pre-registered (v5.status FROZEN) before touching test5/obd5"
+        if ver == "6":
+            assert V6.get("status") == "FROZEN", "v6 must be pre-registered (v6.status FROZEN) before touching test6/real6"
         if ver == "4":
             assert V4.get("status") == "FROZEN", "v4 must be pre-registered (v4.status FROZEN) before touching test4/obd4"
         tuned = json.loads((ROOT / f"results/tuned{'_v' + ver if ver else ''}.json").read_text())
-    grid = method_grid(f"test{ver}" if dataset == "obd" else args.split, tuned)
+    grid = method_grid(f"test{ver}" if dataset in ("obd", "real") else args.split, tuned)
     kind, D = args.basis.split(":")
     grid["basis"] = (kind, int(D))
     cells = [(r, i, None) for r, ints in split["regimes"].items() for i in ints]
