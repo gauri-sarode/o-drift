@@ -24,9 +24,8 @@ policies of increasing noise around the optimal policy are evaluated in every ep
 
 \paragraph{Open Bandit semi-synthetic data.}
 We use the uniformly random logging data of the Men campaign of the Open Bandit
-Dataset~\cite{saito2021open} (452{,}949 records, 34 items). Contexts are the real user
-features reduced to 8 principal components, in their real temporal order, split into 13
-blocks of equal size (12 history windows and the target block). The base reward is a
+Dataset~\cite{saito2021open} (452{,}949 records, 34 items). Real user features (8 principal
+components), in real time order, form 13 equal blocks (12 history windows and the target). The base reward is a
 per-action logistic model with linear and quadratic terms fitted to the real clicks and
 shifted to a mean click rate of $0.05$; actions, propensities, rewards and the injected
 logger and reward drift are synthetic. Because the generating model is quadratic, the
@@ -40,9 +39,9 @@ as the target and the 12 blocks before it as history (5{,}000 records per window
 1{,}000 and 10{,}000 target contexts drawn from block $b$). The target policy is the Bernoulli
 Thompson Sampling (BTS) policy that ran in the same A/B test, represented by its item
 frequencies per position in block $b$; the ground truth is its on-policy click rate in that
-block (0.2--0.7 million impressions, standard error $\le0.2	imes10^{-3}$). Contexts are 8
-principal components of the user features and the position. As in~\cite{saito2021open},
-interactions between items shown together are ignored. 21 tasks $\times$ 20 episodes.
+block (0.2--0.7 million impressions, standard error $\le0.2\times10^{-3}$). Contexts are 8
+principal components of the user features and the position. Interactions between items shown
+together are ignored, as in~\cite{saito2021open}. 21 tasks $\times$ 20 episodes.
 
 \paragraph{Baselines.}
 All share the reward models and basis rule: pooled, anchor-only, recent-$k$ and decayed
@@ -63,12 +62,10 @@ The protocol (\texttt{configs/protocol.yaml} in the code) was fixed before tunin
 method family, baselines included, is tuned on a development split (four environments,
 200 episodes per cell) by minimising the mean over cells of log RMSE. Test splits use
 unseen environments (300 episodes per cell; 200 for Open Bandit) and are run once per
-frozen configuration. The version reported here is the third pre-registered one: the first
-passed its simulator criteria on separate test seeds but failed on Open Bandit, which led to
-the misspecification-3 cells, the robustness criteria, the per-episode basis, offset
-shrinkage, the COPE baseline and the grouping ablation, all registered before this test run.
-A fourth registration (v6) left the method unchanged and added OPFV, a replication on fresh test
-environments and the real-reward evaluation, with its criteria fixed before either was run.
+frozen configuration. The method reported here is the third registered version; the first failed on Open Bandit, which
+led to the misspecification-3 cells, robustness criteria, per-episode basis, offset shrinkage, COPE
+and the grouping ablation. A later registration (v6) kept the method frozen and added OPFV, a
+replication on fresh test environments and the real-reward test, with criteria fixed before running.
 Twelve criteria were pre-registered: five on accuracy, coverage, support and abstention (C1--C5),
 two on robustness in the misspecification-3 and Open Bandit cells (R1: no ratio above 1.5;
 R2: ratio at most 1 in at least half of them), two against COPE (N1) and three on the grouping

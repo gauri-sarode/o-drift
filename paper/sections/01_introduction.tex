@@ -50,12 +50,12 @@ Our contributions are:
   or logger drift (\cref{sec:setting,sec:method});
 \item the \odrift{} estimator, with segment-wise joint reward models, drift-corrected
   reuse, minimum-variance pooling and a random-effects interval (\cref{sec:method});
-\item a pre-registered evaluation on simulated regimes and semi-synthetic Open Bandit
-  data~\cite{saito2021open}, with a one-shot test split, a COPE baseline and a
-  grouping ablation that isolates the monitor (\cref{sec:setup,sec:results}).
+\item a pre-registered evaluation on simulated regimes, semi-synthetic Open Bandit
+  data~\cite{saito2021open} and Open Bandit with real clicks and natural drift, each test split
+  run once, against 19 baselines including faithful implementations of COPE and
+  OPFV~\cite{shimizu2025offpolicy}, with a grouping ablation that isolates the monitor
+  (\cref{sec:setup,sec:results}).
 \end{itemize}
-The evaluation also yields a negative result that we report in full: on Open Bandit,
-where the reward model is misspecified and drift is large, drift-corrected reuse is
-heavily biased, and two later attempts to validate reuse on the anchor or on a
-held-out window failed, because those samples are too small to detect the bias that
-matters (\cref{sec:results}).
+We also report a negative result in full: with a misspecified reward model and large drift,
+drift-corrected reuse is heavily biased, and validating reuse on the anchor or a held-out window
+cannot detect that bias (\cref{sec:results}).

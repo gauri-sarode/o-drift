@@ -122,10 +122,10 @@ def main():
         r"), 21 tasks $\times$ 20 episodes (" + f"{ok.sum()}" + r" with an estimate from every method). Bold: lowest in the row. "
         r"Ratio of \odrift{} to the best baseline: " + f"{rm[OD] / rm[best]:.2f}" + r" [" + f"{ci[0]:.2f}, {ci[1]:.2f}" + r"].}",
         r"\label{tab:real}",
-        r"\begin{tabular}{@{}l" + "c" * len(cols) + r"@{}}\toprule",
+        r"\resizebox{\textwidth}{!}{\begin{tabular}{@{}l" + "c" * len(cols) + r"@{}}\toprule",
         " & " + " & ".join(short[m] for m in cols) + r" \\\midrule",
         *rows,
-        r"\bottomrule\end{tabular}",
+        r"\bottomrule\end{tabular}}",
         r"\end{table}"])
     (ROOT / "paper/tables/tab_real.tex").write_text(tex + "\n")
     print("wrote results/16_real6_summary.json, paper/tables/tab_real.tex")

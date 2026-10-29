@@ -1,11 +1,11 @@
 \begin{table}[t]\centering\scriptsize\setlength{\tabcolsep}{2.6pt}
 \caption{Real rewards and natural drift (Open Bandit, pre-registered test v6): RMSE ($\times10^{-3}$) against BTS's on-policy click rate (mean 6.2, noise sd 0.14), 21 tasks $\times$ 20 episodes (416 with an estimate from every method). Bold: lowest in the row. Ratio of \odrift{} to the best baseline: 1.05 [1.01, 1.09].}
 \label{tab:real}
-\begin{tabular}{@{}lccccccccccc@{}}\toprule
+\resizebox{\textwidth}{!}{\begin{tabular}{@{}lccccccccccc@{}}\toprule
  & \odrift{} & Pooled & COPE & SLOPE & Mon.-sel. & Decay & MAGIC & Transp. & Forec. & OPFV & Anchor \\\midrule
 All tasks & 1.14 & 1.09 & \textbf{1.09} & 1.09 & 1.17 & 1.20 & 2.15 & 2.75 & 3.01 & 4.56 & 9.07 \\
 Men & 1.49 & 1.37 & 1.38 & \textbf{1.35} & 1.55 & 1.44 & 2.54 & 3.66 & 4.12 & 4.19 & 7.79 \\
 Women & 1.00 & 0.97 & \textbf{0.93} & 0.99 & 0.97 & 1.15 & 2.19 & 2.18 & 2.33 & 4.81 & 8.73 \\
 All items & \textbf{0.83} & 0.86 & \textbf{0.86} & 0.86 & 0.86 & 0.95 & 1.60 & 2.12 & 2.18 & 4.67 & 10.50 \\
-\bottomrule\end{tabular}
+\bottomrule\end{tabular}}
 \end{table}

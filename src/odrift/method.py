@@ -127,11 +127,12 @@ class Component:
     corr_scores: np.ndarray   # w rho (R - q_hat), length n_k
     diagnostics: Diagnostics
     members: dict = field(default_factory=dict)  # pooled components: window -> share of records
+    var_floor: float = 0.0    # lower bound on the correction variance (anchor_var_floor; 0 = none)
 
     @property
     def var(self) -> float:
         return float(self.dm_scores.var(ddof=1) / len(self.dm_scores)
-                     + self.corr_scores.var(ddof=1) / len(self.corr_scores))
+                     + max(self.corr_scores.var(ddof=1) / len(self.corr_scores), self.var_floor))
 
 
 @dataclass
@@ -198,7 +199,7 @@ def covariance(components: list) -> np.ndarray:
     M = dm.shape[1]
     S = np.cov(dm) / M if len(components) > 1 else np.array([[dm.var(ddof=1) / M]])
     S = np.atleast_2d(S)
-    corr_var = [c.corr_scores.var(ddof=1) / len(c.corr_scores) for c in components]
+    corr_var = [max(c.corr_scores.var(ddof=1) / len(c.corr_scores), getattr(c, "var_floor", 0.0)) for c in components]
     S[np.diag_indices_from(S)] += corr_var
     for i in range(len(components)):  # components built on the same logged data share their correction part
         for j in range(i + 1, len(components)):
@@ -465,6 +466,9 @@ class ODriftConfig:
     model_anchor: bool = False    # joint fit only: anchor records join the newest segment at t = 1, so the
                                   # target-time prediction is interpolated, not extrapolated
     anchor_sn: bool = False      # self-normalized DR for the anchor component
+    anchor_var_floor: bool = False  # post-hoc (decision log 39): an anchor whose rewards are all equal (e.g. no
+                                    # clicks) gets the correction variance of one pseudo-success, Laplace-style,
+                                    # instead of an estimated variance of 0; False = frozen v3 behaviour
     reuse_both: bool = False     # v2 dev candidate: non-reference segments also enter uncorrected (own-model DM)
     reuse_lam: float = 0.0       # v2 reference-validated reuse: > 0 = debiased-MSE weights over balanced segment
                                  # components, bias measured against reference segment + anchor; 0 = v1 pooling
@@ -626,6 +630,8 @@ def build_components(history: list, anchor: LoggedData, X_target: np.ndarray, pi
         anchor_comp = transported_dr(anchor, X_target, pi, n_actions, len(history), z_diag,
                                      cfg.min_ess, same_distribution=True, nuis=anc_nuis,
                                      self_normalize=cfg.anchor_sn)
+        if cfg.anchor_var_floor:
+            anchor_comp.var_floor = laplace_var_floor(anchor, pi)
     return comps, anchor_comp
 
 
@@ -891,7 +897,20 @@ def balanced_segment_components(history: list, anchor: LoggedData, X_target: np.
     if anc_nuis is not None:
         anc = next(c for c in [transported_dr(anchor, X_target, pi, n_actions, len(history), z_diag, cfg.min_ess,
                                               same_distribution=True, nuis=anc_nuis)])
+        if cfg.anchor_var_floor:
+            anc.var_floor = laplace_var_floor(anchor, pi)
     return comps, anc
+
+
+def laplace_var_floor(data: LoggedData, pi) -> float:
+    """Correction variance of a sample whose rewards are all equal, as if one of its n outcomes had flipped:
+    mean(rho^2) p (1 - p) / n with p = 1 / (n + 2). Returns 0 when the rewards vary (no floor needed)."""
+    if np.ptp(data.R) > 0:
+        return 0.0
+    n = len(data)
+    rho = importance_weights(data, pi.probs(data.X))
+    p = 1 / (n + 2)
+    return float(np.mean(rho ** 2) * p * (1 - p) / n)
 
 
 def odrift_balanced(history: list, anchor: LoggedData, X_target: np.ndarray, pi, n_actions: int,

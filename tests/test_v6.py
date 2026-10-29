@@ -39,3 +39,23 @@ def test_opfv_reduces_to_mean_reward_and_avoids_biased_windows():
     e, chosen = bl.opfv(d, q0, qt, np.zeros((50, 2)), Uniform(A), K, feats)
     assert chosen in ("recent0", "recent1", "recent2", "recent3", "recent6", "period4", "period6", "period3", "period2") \
         and not feats[chosen][:K // 2].any() or abs(e.value - 0.2) < 0.03
+
+
+def test_laplace_var_floor_only_for_constant_rewards():
+    from odrift.method import laplace_var_floor
+    from odrift.simulator import LoggedData
+    n, A = 200, 4
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(n, 3))
+    base = dict(X=X, A=rng.integers(A, size=n), pscore=np.full(n, 1 / A), probs_all=np.full((n, A), 1 / A),
+                window=np.zeros(n, dtype=int), logger_id=np.zeros(n, dtype=int))
+
+    class Uniform:
+        def probs(self, X):
+            return np.full((len(X), A), 1 / A)
+
+    zero = LoggedData(R=np.zeros(n), **base)
+    p = 1 / (n + 2)
+    assert np.isclose(laplace_var_floor(zero, Uniform()), p * (1 - p) / n)  # rho = 1
+    varied = LoggedData(R=(rng.random(n) < 0.1).astype(float), **base)
+    assert laplace_var_floor(varied, Uniform()) == 0.0

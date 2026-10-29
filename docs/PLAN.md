@@ -514,3 +514,14 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    method.select_weights' warm start divides by it -> NaN for O-Drift and every component-pooling baseline
    (transport family). Analysis on the 416 common episodes; failures reported. Code left unchanged while
    test6 runs.
+39. **Post-hoc after v6 (2026-10-29; user: "run everything").** (a) Zero-click anchor fix:
+   ODriftConfig.anchor_var_floor (default False = frozen behaviour, so every pre-registered run is unchanged):
+   an anchor whose rewards are all equal gets the correction variance of one pseudo-success,
+   mean(rho^2) p(1-p)/n with p = 1/(n+2) (method.laplace_var_floor), instead of 0. scripts/18_real_floor.py
+   reruns frozen O-Drift on all 420 real6 episodes with and without it; the run without it must reproduce
+   results/03_real6.json exactly (asserted). Spot check before the full run: the 4 failed episodes all have 0
+   anchor clicks and get finite estimates (6.12/4.51/4.01/4.60e-3 vs truth 7.01/4.49/4.49/4.10e-3); an
+   episode with clicks is unchanged. Reported as post-hoc; the pre-registered E1 result stays the 416-episode
+   one. (b) scripts/17_runtime.py: per-episode wall clock of O-Drift and the main baselines, each end to end
+   with its own models, single thread, after all pool runs (machine idle), dev-type seeds 90000+ (outside
+   every split). (c) scripts/run_v6_posthoc.sh chains: 04_analyze test6 -> 18 -> 17 after v6_noanchor.done.

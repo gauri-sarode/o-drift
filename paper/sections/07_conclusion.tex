@@ -8,13 +8,14 @@ evaluation separated \odrift{} from mean-reward grouping in every reward-drift s
 The limitations are as important as the result. First, drift-corrected reuse depends on the
 reward-drift difference lying in the model class (A4); on semi-synthetic Open Bandit data,
 with a misspecified model and large drift, it was heavily biased, and the estimator without
-reuse was the better choice. Second, checks of reuse on the anchor or a held-out window could not repair
-this: at per-period sample sizes the reuse bias is not observable. This is an information limit,
-not a tuning problem, and binds any method that validates reuse on the current period alone. Third, gradual drift
+reuse was the better choice. Second, checks on the anchor or a held-out window could not repair this: at per-period
+sample sizes the reuse bias is not observable, an information limit that binds any method
+validating reuse on the current period alone. Third, gradual drift
 violates the piecewise assumption and favours methods that model a trend. Fourth, our
 heterogeneity-adjusted interval undercovers when bias remains, and the certified alternative
-is wide. Finally, Open Bandit gives real contexts but synthetic rewards and drift;
-naturally drifting logs remain open.
+is wide. Finally, on real clicks the natural drift was below what the anchor can observe,
+so that test shows \odrift{} is safe when there is little to correct (within 5\% of the best
+baseline), not that it helps; logs with larger natural reward drift remain open.
 
 Two directions follow: reward models flexible enough to make (A4) plausible, so that reuse is
 safe when attempted, and reporting for each estimate how much unobservable drift would change

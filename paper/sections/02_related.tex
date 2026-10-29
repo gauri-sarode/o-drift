@@ -4,12 +4,10 @@
 Inverse propensity scoring~\cite{horvitz1952generalization} and the doubly robust (DR)
 estimator~\cite{dudik2011doubly} are the standard tools for contextual bandit OPE; we
 cross-fit the reward models as in double machine learning~\cite{chernozhukov2018double}.
-When the data come from several loggers, weighting each record by the mixture of the
-logging policies (balanced or multiple importance weighting) reduces variance and stays
-unbiased~\cite{agarwal2017effective,kallus2021optimal}. Covariate shift between the
-logging and target populations is handled by density-ratio transport~\cite{uehara2020offpolicy}.
-\odrift{} uses all three ingredients; what it adds is the decision of which historical
-data the reweighted estimate may use.
+Weighting by the mixture of several logging policies (balanced or multiple importance
+weighting) reduces variance~\cite{agarwal2017effective,kallus2021optimal}, and density-ratio
+transport handles covariate shift~\cite{uehara2020offpolicy}. \odrift{} uses all three; it adds
+the decision of which historical data the reweighted estimate may use.
 
 \paragraph{Non-stationary OPE.}
 Jagerman et al.~\cite{jagerman2019when} study sliding-window and exponentially decayed
@@ -24,17 +22,15 @@ in the value; none distinguishes the mechanism behind a change.
 \paragraph{Cross-domain OPE.}
 COPE~\cite{natsubori2025cross} treats other domains as sources for a target domain,
 clusters domains by the similarity of their mean rewards and combines multiple importance
-weighting inside the target cluster with a decomposed reward model. Treating time
-windows as domains makes COPE the closest existing estimator to ours. Its clustering
-statistic, the mean reward, mixes all three mechanisms; our monitor isolates the one
-that biases reweighted estimates. We include COPE as a tuned baseline and as a grouping
-ablation.
+weighting inside the target cluster with a decomposed reward model. With time
+windows as domains it is the closest existing estimator to ours, but its clustering statistic,
+the mean reward, mixes all three mechanisms; we include it as a tuned baseline and as a
+grouping ablation.
 
 \paragraph{Estimator selection and drift detection.}
 MAGIC~\cite{thomas2016data}, SLOPE~\cite{su2020adaptive} and adaptive weighting~\cite{zhan2021offpolicy}
-choose among or blend estimators of increasing bias and decreasing variance; we use the
-first two as baselines over nested recency windows. Drift detection on streams is
-surveyed in~\cite{gama2014survey}. Our monitor is a heterogeneity test~\cite{cochran1954combination}
+choose among or blend estimators of increasing bias and decreasing variance (baselines here,
+over nested recency windows); drift detection on streams is surveyed in~\cite{gama2014survey}. Our monitor is a heterogeneity test~\cite{cochran1954combination}
 on per-action residuals and our interval the DerSimonian--Laird interval~\cite{dersimonian1986meta};
 the novelty is the statistic tested, not the tests. Selecting segments by a preliminary test is a
 pre-test estimator~\cite{bancroft1944biases}, with its known risk near the threshold.
