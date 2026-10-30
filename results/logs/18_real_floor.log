@@ -1,35 +1,5 @@
-/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: divide by zero encountered in divide
-  x0 = 1 / np.diag(Q)
-/Users/gauris/dev/o-drift/src/odrift/method.py:262: RuntimeWarning: invalid value encountered in divide
-  x0 /= x0.sum()
-/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: divide by zero encountered in divide
-  x0 = 1 / np.diag(Q)
-/Users/gauris/dev/o-drift/src/odrift/method.py:262: RuntimeWarning: invalid value encountered in divide
-  x0 /= x0.sum()
-/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: divide by zero encountered in divide
-  x0 = 1 / np.diag(Q)
-/Users/gauris/dev/o-drift/src/odrift/method.py:262: RuntimeWarning: invalid value encountered in divide
-  x0 /= x0.sum()
-/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: divide by zero encountered in divide
-  x0 = 1 / np.diag(Q)
-/Users/gauris/dev/o-drift/src/odrift/method.py:262: RuntimeWarning: invalid value encountered in divide
-  x0 /= x0.sum()
-/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: divide by zero encountered in divide
-  x0 = 1 / np.diag(Q)
-/Users/gauris/dev/o-drift/src/odrift/method.py:262: RuntimeWarning: invalid value encountered in divide
-  x0 /= x0.sum()
-/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: divide by zero encountered in divide
-  x0 = 1 / np.diag(Q)
-/Users/gauris/dev/o-drift/src/odrift/method.py:262: RuntimeWarning: invalid value encountered in divide
-  x0 /= x0.sum()
-/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: divide by zero encountered in divide
-  x0 = 1 / np.diag(Q)
-/Users/gauris/dev/o-drift/src/odrift/method.py:262: RuntimeWarning: invalid value encountered in divide
-  x0 /= x0.sum()
-/Users/gauris/dev/o-drift/src/odrift/method.py:261: RuntimeWarning: divide by zero encountered in divide
-  x0 = 1 / np.diag(Q)
-/Users/gauris/dev/o-drift/src/odrift/method.py:262: RuntimeWarning: invalid value encountered in divide
-  x0 /= x0.sum()
 reproduced frozen O-Drift on all 420 episodes; floor changes 4 episodes (anchor clicks there: [0, 0, 0, 0]); non-finite with floor: 0
-all 420 episodes: O-Drift+floor RMSE 1.137e-3, best baseline decay_dr[0.95] 1.078e-3, ratio 1.055 CI [0.99, 1.119], coverage 0.748
+all 420 episodes: O-Drift+floor RMSE 1.137e-3, best baseline cope[13] 1.082e-3, ratio 1.051 CI [1.015, 1.092], coverage 0.748
 wrote results/18_real6_floor.json
+
+[exited with code 0]
