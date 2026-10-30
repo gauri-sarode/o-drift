@@ -12,11 +12,11 @@ drift correction, and pools the segment estimates at minimum variance with a
 random-effects interval. In a pre-registered evaluation with a one-shot test split, \odrift{}
 outperforms a cross-domain estimator that groups periods by mean reward in all 15
 reward-drift settings, and replacing its residual test by mean-reward grouping causes
-spurious splits under context and logger drift. On semi-synthetic Open Bandit data,
+spurious splits under context and logger drift; a second pre-registered test on fresh
+environments, adding the time-feature estimator OPFV, passes every criterion again. On semi-synthetic Open Bandit data,
 however, drift-corrected reuse is strongly biased; we report this failure and show
 why validation on the small current-period sample cannot repair it. On real clicks with
 natural drift (Open Bandit's A/B test, with Thompson sampling's own click rate as ground
-truth), \odrift{} stays within 5\% of the best of 19 baselines, including COPE and the
-time-feature estimator OPFV.
+truth), \odrift{} stays within 5\% of the best of 19 baselines.
 \keywords{Off-policy evaluation \and Non-stationarity \and Concept drift \and Recommender systems}
 \end{abstract}

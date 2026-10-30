@@ -1,0 +1,24 @@
+S0@0.0     n=300  best: pooled_dr=0.0053  odrift=0.0054  odrift2[0.0]=0.0054  odrift3[0.25]=0.0054
+S1@0.5     n=300  best: odrift=0.0059  odrift2[0.0]=0.0059  odrift3[0.25]=0.0059  pooled_dr=0.0151
+S1@2.0     n=300  best: odrift=0.0084  odrift2[0.0]=0.0084  odrift3[0.25]=0.0084  pooled_dr=0.0607
+S2@0.0     n=300  best: odrift=0.0058  odrift2[0.0]=0.0058  odrift3[0.25]=0.0058  pooled_dr=0.0062
+S3a@0.25   n=300  best: pooled_dr=0.0099  odrift3[0.25]=0.0101  odrift=0.0101  odrift2[0.0]=0.0101
+S3a@1.0    n=300  best: pooled_dr=0.0301  odrift=0.0325  odrift2[0.0]=0.0325  odrift3[0.25]=0.0325
+S3b@0.25   n=300  best: pooled_dr=0.0104  odrift3[0.25]=0.0106  odrift=0.0106  odrift2[0.0]=0.0106
+S3b@1.0    n=300  best: pooled_dr=0.0344  odrift=0.0354  odrift2[0.0]=0.0354  odrift3[0.25]=0.0354
+S4@0.25    n=300  best: odrift=0.0139  odrift2[0.0]=0.0139  odrift3[0.25]=0.0140  pooled_dr=0.0155
+S4@1.0     n=300  best: pooled_dr=0.0419  odrift3[0.25]=0.0532  odrift=0.0533  odrift2[0.0]=0.0533
+S5@0.5     n=300  best: pooled_dr=0.0175  odrift3[0.25]=0.0190  odrift=0.0190  odrift2[0.0]=0.0190
+S5@1.0     n=300  best: pooled_dr=0.0297  odrift3[0.25]=0.0357  odrift=0.0358  odrift2[0.0]=0.0358
+S6@0.0     n=300  best: odrift=0.0062  odrift2[0.0]=0.0062  odrift3[0.25]=0.0062  pooled_dr=0.0118
+S7@0.0     n=300  best: pooled_dr=0.0051  odrift=0.0070  odrift2[0.0]=0.0070  odrift3[0.25]=0.0070
+S8@0.5     n=300  best: pooled_dr=0.0193  odrift=0.0194  odrift2[0.0]=0.0194  odrift3[0.25]=0.0194
+S8@1.0     n=300  best: pooled_dr=0.0363  odrift=0.0379  odrift2[0.0]=0.0379  odrift3[0.25]=0.0382
+S8b@1.0    n=300  best: odrift=0.0145  odrift2[0.0]=0.0145  odrift3[0.25]=0.0145  pooled_dr=0.0153
+S0@0.0#m3.0 n=300  best: pooled_dr=0.0047  odrift=0.0049  odrift2[0.0]=0.0049  odrift3[0.25]=0.0049
+S2@0.0#m3.0 n=300  best: odrift=0.0053  odrift2[0.0]=0.0053  odrift3[0.25]=0.0053  pooled_dr=0.0056
+S3a@1.0#m3.0 n=300  best: pooled_dr=0.0244  odrift=0.0246  odrift2[0.0]=0.0246  odrift3[0.25]=0.0248
+S4@1.0#m3.0 n=300  best: pooled_dr=0.0364  odrift3[0.25]=0.0429  odrift=0.0432  odrift2[0.0]=0.0432
+S5@1.0#m3.0 n=300  best: pooled_dr=0.0211  odrift3[0.25]=0.0281  odrift=0.0284  odrift2[0.0]=0.0284
+S8@1.0#m3.0 n=300  best: pooled_dr=0.0283  odrift=0.0283  odrift2[0.0]=0.0283  odrift3[0.25]=0.0284
+wrote /Users/gauris/dev/o-drift/results/03_test6_anchor0.json

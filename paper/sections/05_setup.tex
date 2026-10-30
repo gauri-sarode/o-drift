@@ -66,10 +66,10 @@ frozen configuration. The method reported here is the third registered version; 
 led to the misspecification-3 cells, robustness criteria, per-episode basis, offset shrinkage, COPE
 and the grouping ablation. A later registration (v6) kept the method frozen and added OPFV, a
 replication on fresh test environments and the real-reward test, with criteria fixed before running.
-Twelve criteria were pre-registered: five on accuracy, coverage, support and abstention (C1--C5),
-two on robustness in the misspecification-3 and Open Bandit cells (R1: no ratio above 1.5;
-R2: ratio at most 1 in at least half of them), two against COPE (N1) and three on the grouping
-ablation (N2); their exact wording is in the protocol file.
+The registered criteria cover accuracy, coverage, support and abstention (C1--C5),
+robustness in the misspecification-3 and Open Bandit cells (R1: no ratio above 1.5; R2: ratio
+$\le1$ in half of them), COPE (N1), the grouping ablation (N2), OPFV (N3, v6) and the real-reward
+test (E1: ratio $\le1.10$); their wording is in the protocol file.
 
 \paragraph{Metrics.}
 RMSE ($\times10^{-3}$); its ratio to the best tuned baseline with a paired bootstrap 95\%

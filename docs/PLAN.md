@@ -525,3 +525,18 @@ can never be narrower than an anchor-only interval on the full anchor. Therefore
    one. (b) scripts/17_runtime.py: per-episode wall clock of O-Drift and the main baselines, each end to end
    with its own models, single thread, after all pool runs (machine idle), dev-type seeds 90000+ (outside
    every split). (c) scripts/run_v6_posthoc.sh chains: 04_analyze test6 -> 18 -> 17 after v6_noanchor.done.
+40. **v6 test6 replication result (2026-10-30; results/03_test6.json, 03_test6_anchor0.json,
+   04_test6_summary.json).** Frozen v3 method on the fresh test4 environments (500-series seeds never
+   used before), 23 cells x 300 episodes, no missing estimates. All 14 registered criteria PASS: C1 (wins
+   S3a@0.25 0.84, S4@0.25 0.88), C2-C5, R1/R2 on misspec-3 only (max 1.16, 3/4 <= 1), N1 (COPE beaten
+   15/15), N2 (0 false splits; blind 0.01-0.77), N3 (OPFV beaten 15/15, ratios 0.15-0.77). Not replicated:
+   S4@1.0 0.65 -> 1.01 (tbdecay), S4@1.0#m3 0.99 -> 1.16. Replicated losses: S3b@1.0 2.49, S3a@1.0 1.21,
+   S7 1.41. OPFV's Eq. 7 rule is nearly uniform over features (all-windows chosen 19% in S0) because its
+   bias term is measured against the finest-feature (anchor-only) estimate. Runtime (17_runtime, idle
+   machine, one thread): O-Drift 1.0 s sim / 1.5 s OBD per episode and policy; COPE 0.58/0.27; pooled
+   0.49/0.11. Paper: replication + OPFV columns in Table 1, related-work table dropped for space (back to
+   12 pages). Fix found while writing: 18_real_floor first compared against the oracle-tuned decay grid;
+   now restricted to the tuned baselines of 16_real_analysis.
+   Floor rerun (18_real_floor, corrected baseline set): frozen O-Drift reproduced on all 420 episodes; the
+   floor changes exactly the 4 zero-click episodes; on all 420, ratio to COPE[13] 1.051 [1.015, 1.092],
+   coverage 0.748 (same as the registered 416-episode result). One sentence added to the paper, labelled post hoc.

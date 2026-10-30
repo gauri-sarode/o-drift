@@ -1,0 +1,11 @@
+Simulator (S4@1.0) episode 0: Pooled DR 0.04s  SLOPE 0.04s  COPE 0.12s  Transport bal. decay 0.12s  OPFV 0.09s  Transport DR 0.28s  O-Drift 0.39s
+Simulator (S4@1.0) episode 1: Pooled DR 0.51s  SLOPE 0.51s  COPE 0.60s  Transport bal. decay 0.60s  OPFV 0.71s  Transport DR 1.21s  O-Drift 1.01s
+Simulator (S4@1.0) episode 2: Pooled DR 0.52s  SLOPE 0.53s  COPE 0.62s  Transport bal. decay 0.61s  OPFV 0.73s  Transport DR 1.23s  O-Drift 1.02s
+Simulator (S4@1.0) episode 3: Pooled DR 0.04s  SLOPE 0.04s  COPE 0.13s  Transport bal. decay 0.13s  OPFV 0.09s  Transport DR 0.29s  O-Drift 0.39s
+Simulator (S4@1.0) episode 4: Pooled DR 0.49s  SLOPE 0.50s  COPE 0.58s  Transport bal. decay 0.58s  OPFV 0.71s  Transport DR 1.20s  O-Drift 1.02s
+Open Bandit, real rewards (Men) episode 0: Pooled DR 0.11s  SLOPE 0.11s  COPE 0.28s  Transport bal. decay 0.26s  OPFV 0.17s  Transport DR 0.34s  O-Drift 1.70s
+Open Bandit, real rewards (Men) episode 1: Pooled DR 0.11s  SLOPE 0.11s  COPE 0.27s  Transport bal. decay 0.27s  OPFV 0.15s  Transport DR 0.33s  O-Drift 1.51s
+Open Bandit, real rewards (Men) episode 2: Pooled DR 0.11s  SLOPE 0.11s  COPE 0.27s  Transport bal. decay 0.27s  OPFV 0.15s  Transport DR 0.32s  O-Drift 1.57s
+Open Bandit, real rewards (Men) episode 3: Pooled DR 0.10s  SLOPE 0.10s  COPE 0.26s  Transport bal. decay 0.26s  OPFV 0.14s  Transport DR 0.31s  O-Drift 1.28s
+Open Bandit, real rewards (Men) episode 4: Pooled DR 0.10s  SLOPE 0.10s  COPE 0.25s  Transport bal. decay 0.26s  OPFV 0.14s  Transport DR 0.30s  O-Drift 1.06s
+wrote results/17_runtime.json, paper/tables/tab_runtime.tex

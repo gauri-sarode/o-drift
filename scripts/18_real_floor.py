@@ -24,6 +24,9 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("ev", ROOT / "scripts/03_evaluate.py")
 ev = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ev)
+spec16 = importlib.util.spec_from_file_location("real", ROOT / "scripts/16_real_analysis.py")
+real = importlib.util.module_from_spec(spec16)
+spec16.loader.exec_module(real)
 TUNED = json.loads((ROOT / "results/tuned_v6.json").read_text())
 OD = f"odrift3[{TUNED['odrift3']}]"
 
@@ -73,8 +76,8 @@ def main():
     # all 420 episodes: O-Drift with the floor vs every baseline that returned an estimate in all of them
     envs = np.array(cell["env_of_rep"])
     truth = np.array([cell["truths"][str(e)][0] for e in envs])
-    bases = [m for m in cell["reps"][0] if m not in (OD, "oracle") and not m.startswith(("odrift", "ablate"))
-             and all(np.isfinite(r[m][0]["est"]) for r in cell["reps"])]
+    # the tuned baselines of scripts/16_real_analysis.py (not the oracle-tuned recent/decay grids)
+    bases = [m for m in real.BASELINES if all(np.isfinite(r[m][0]["est"]) for r in cell["reps"])]
     sq = {m: np.array([(r[m][0]["est"] - t) ** 2 for r, t in zip(cell["reps"], truth)]) for m in bases}
     sq["odrift_floor"] = (floor - truth) ** 2
     rm = {m: float(np.sqrt(v.mean())) for m, v in sq.items()}
